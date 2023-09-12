@@ -1,6 +1,8 @@
 from os import sep, scandir, DirEntry
 from os.path import isfile, isdir
 from typing import List, Dict
+import re
+import csv
 
 import json
 import json5
@@ -327,6 +329,10 @@ class SubParatranz(ParatrazProject):
                              FromOriginal=self.inCustomStart, ToLocalization=self.outCustomStart)
         self.ImportOneConfig(Register=path, Path=['/data/world/factions/default_ranks.json'],
                              FromOriginal=self.inDefaultRanks, ToLocalization=self.outDefaultRanks)
+        self.ImportOneConfig(Register=path, Path=['/data/config/modFiles/magicBounty_data.json'],
+                             FromOriginal=self.inMagicBountyData, ToLocalization=self.outMagicBountyData)
+        self.ImportOneConfig(Register=path, Path=['/data/config/LunaSettings.csv'],
+                             FromOriginal=self.inLunaSettings, ToLocalization=self.outLunaSettings)
 
     # data/missions/*
     def inMissions(self, *args):
@@ -567,6 +573,70 @@ class SubParatranz(ParatrazProject):
         with open(args[2], 'w', encoding='UTF-8') as tFile:
             json5.dump(tOriginal, tFile, ensure_ascii=False, indent=4, quote_keys=True)
 
+    # data/config/modFiles/magicBounty_data.json
+    def inMagicBountyData(self, *args):
+        """这部分处理的是MagicLib的自带HVB部分。"""
+        with open(args[0], encoding='UTF-8') as tFile:
+            tOriginal: Dict[str, dict] = json5.loads(self.__filterJSON5(tFile.read()))
+        result = []
+        for bountyID in tOriginal:
+            for paraName in ('job_name', 'job_description', 'job_comm_reply', 'job_intel_success', 'job_intel_failure', 'fleet_name', 'fleet_flagship_name'):
+                if paraName in tOriginal[bountyID]:
+                    result.append(self.__buildDict(f'{bountyID}#{paraName}', tOriginal[bountyID].get(paraName)))
+        self.__writeParatranzJSON(result, args[1])
+
+    def outMagicBountyData(self, *args):
+        tTranslation = self.__readParatranzJSON(args[1])
+        # 读取内容
+        result = {}
+        for unit in tTranslation:
+            keyID = unit.get('key').split('#')
+            if keyID[0] not in result:
+                continue
+            if self.__hasTranslated(unit) and len(unit.get('translation')) > 0:
+                result.get(keyID[0])[keyID[1]] = unit.get('translation').replace('\\n', '\n')
+            else:
+                result.get(keyID[0])[keyID[1]] = unit.get('original')
+        # 处理完成
+        with open(args[2], 'w', encoding='UTF-8') as tFile:
+            json5.dump(result, tFile, ensure_ascii=False, indent=4, quote_keys=True)
+
+    # data/config/LunaSettings.csv
+    # 本来这个文件应该交给汉化组写的脚本处理，但是由于某些原因……
+    def inLunaSettings(self, *args):
+        result = []
+        with open(args[0], encoding='UTF-8') as tFile:
+            for lineDict in list(csv.DictReader(tFile)):
+                if lineDict['fieldType'] == 'Header':  # 检测到头部信息
+                    result.append(self.__buildDict(lineDict['fieldID'] + '#defaultValue', lineDict['defaultValue']))
+                else:
+                    for keyStr in ('fieldName', 'fieldDescription'):
+                        if keyStr in lineDict:
+                            result.append(self.__buildDict('{0}#{1}'.format( lineDict['fieldID'], keyStr),
+                                                           lineDict[keyStr]))
+        self.__writeParatranzJSON(result, args[1])
+
+    def outLunaSettings(self, *args):
+        # 读取内容
+        with open(args[0], encoding='UTF-8') as tFile:
+            result = list(csv.DictReader(tFile))
+        tVar_dict = {}
+        for unit in self.__readParatranzJSON(args[1]):
+            keyID = unit.get('key').split('#')
+            if keyID[0] not in tVar_dict:
+                tVar_dict[keyID[0]] = {}
+            if self.__hasTranslated(unit) and len(unit.get('translation')) > 0:
+                tVar_dict[keyID[0]][keyID[1]] = unit.get('translation')
+            else:
+                tVar_dict[keyID[0]][keyID[1]] = unit.get('original')
+        # 写入内容
+        for keyStr in tVar_dict:
+            for unitID in range(len(result)):
+                if result[unitID]['fieldID'] == keyStr:
+                    result[unitID].update(tVar_dict[keyStr])
+        with open(args[2], 'w', encoding='UTF-8') as tFile:
+            csv.DictWriter(tFile, list(result[0].keys())).writerows(result)
+
     @staticmethod
     def __filterJSON5(fileContent: str):
         fileContent = fileContent.strip()
@@ -576,12 +646,21 @@ class SubParatranz(ParatrazProject):
             if f'{number}f' in fileContent:
                 fileContent.replace(f'{number}f', str(number))
         tVar = []
+        replace1 = re.compile('[^\\\\]",? *#')  # strings.json定位
+        replace2 = re.compile('(\\d|true|false),? *#')  # 通用定位数据
         for line in fileContent.splitlines():
             line = line.strip()
-            if '#' in line:
-                line = line.replace('#', '//')
-            if len(line.strip()) == 0:
+            if line.startswith('#') or len(line) == 0:
                 continue
+            elif replace1.search(line) is not None:
+                toReplace = replace1.search(line).group()[1:]
+                if ',' in toReplace:
+                    line = line.replace(toReplace, '", //')
+                else:
+                    line = line.replace(toReplace, '" //')
+            elif replace2.search(line) is not None:
+                tStr = replace2.search(line).group()
+                line = line.replace(tStr, tStr[:-1]+'//')
             tVar.append(line)
         return '\n'.join(tVar)
 

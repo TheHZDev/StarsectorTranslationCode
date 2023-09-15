@@ -607,6 +607,8 @@ class SubParatranz(ParatrazProject):
         result = []
         with open(args[0], encoding='UTF-8') as tFile:
             for lineDict in list(csv.DictReader(tFile)):
+                if lineDict['fieldID'] == '':
+                    continue
                 if lineDict['fieldType'] == 'Header':  # 检测到头部信息
                     result.append(self.__buildDict(lineDict['fieldID'] + '#defaultValue', lineDict['defaultValue']))
                 else:

@@ -1,3 +1,4 @@
+import pprint
 from os import sep, scandir, DirEntry
 from os.path import isfile, isdir
 from typing import List, Dict
@@ -606,38 +607,54 @@ class SubParatranz(ParatrazProject):
     def inLunaSettings(self, *args):
         result = []
         with open(args[0], encoding='UTF-8') as tFile:
-            for lineDict in list(csv.DictReader(tFile)):
-                if lineDict['fieldID'] == '':
+            tVar = list(csv.DictReader(tFile))
+            tVar1 = self.__extractDuplicateKeyText(tVar, 'fieldID')  # 预提取重复的ID信息数据
+            for tabUnit in self.__extractDuplicateKeyText(tVar, 'tab').keys():
+                if tabUnit != '':
+                    result.append(self.__buildDict(f'tabValue${len(result)+1}', tabUnit, '分类页数据'))
+            for lineDict in tVar:
+                line_FieldID = lineDict['fieldID']
+                extraNumber = ''
+                if line_FieldID == '':
                     continue
-                if lineDict['fieldType'] == 'Header':  # 检测到头部信息
-                    result.append(self.__buildDict(lineDict['fieldID'] + '#defaultValue', lineDict['defaultValue']))
+                if lineDict['fieldType'] in ('Header', 'Text'):  # 检测到特殊头部信息
+                    if line_FieldID in tVar1:  # 需要特别关照的重复键值将打上不同的ID，以便paratranz能认出来
+                        extraNumber = f'${tVar1[line_FieldID]}'
+                        tVar1[line_FieldID] += 1
+                    result.append(self.__buildDict(f'{line_FieldID}#defaultValue{extraNumber}', lineDict['defaultValue'], f'[本行原始数据]\n{pprint.pformat(lineDict, sort_dicts=False)}'))
                 else:
                     for keyStr in ('fieldName', 'fieldDescription'):
-                        if keyStr in lineDict:
-                            result.append(self.__buildDict('{0}#{1}'.format( lineDict['fieldID'], keyStr),
-                                                           lineDict[keyStr]))
+                        if keyStr in lineDict and lineDict[keyStr].strip() != '':
+                            if line_FieldID in tVar1:
+                                extraNumber = f'${tVar1[line_FieldID]}'
+                                tVar1[line_FieldID] += 1
+                            result.append(self.__buildDict('{0}#{1}{2}'.format( line_FieldID, keyStr, extraNumber),
+                                                           lineDict[keyStr], f'[本行原始数据]\n{pprint.pformat(lineDict, sort_dicts=False)}'))
         self.__writeParatranzJSON(result, args[1])
 
     def outLunaSettings(self, *args):
         # 读取内容
         with open(args[0], encoding='UTF-8') as tFile:
             result = list(csv.DictReader(tFile))
-        tVar_dict = {}
         for unit in self.__readParatranzJSON(args[1]):
-            keyID = unit.get('key').split('#')
-            if keyID[0] not in tVar_dict:
-                tVar_dict[keyID[0]] = {}
-            if self.__hasTranslated(unit) and len(unit.get('translation')) > 0:
-                tVar_dict[keyID[0]][keyID[1]] = unit.get('translation')
+            csvKeyID, csvValueKeyID = unit.get('key').split('#')
+            if '$' in csvValueKeyID:
+                csvValueKeyID = csvValueKeyID.split('$')[0]  # 重复的键值会额外比较原文是否相符
+                for line in result:
+                    if line['fieldID'] == csvKeyID and line[csvValueKeyID] == unit.get('original'):
+                        if self.__hasTranslated(unit) and len(unit.get('translation')) > 0:
+                            line[csvValueKeyID] = unit.get('translation')
+                            break
             else:
-                tVar_dict[keyID[0]][keyID[1]] = unit.get('original')
-        # 写入内容
-        for keyStr in tVar_dict:
-            for unitID in range(len(result)):
-                if result[unitID]['fieldID'] == keyStr:
-                    result[unitID].update(tVar_dict[keyStr])
-        with open(args[2], 'w', encoding='UTF-8') as tFile:
-            csv.DictWriter(tFile, list(result[0].keys())).writerows(result)
+                for line in result:
+                    if line['fieldID'] == csvKeyID:
+                        if self.__hasTranslated(unit) and len(unit.get('translation')) > 0:
+                            line[csvValueKeyID] = unit.get('translation')
+                            break
+        with open(args[2], 'w', newline='', encoding='UTF-8') as tFile:
+            tVar = csv.DictWriter(tFile, list(result[0].keys()))
+            tVar.writeheader()
+            tVar.writerows(result)
 
     @staticmethod
     def __filterJSON5(fileContent: str):
@@ -695,6 +712,19 @@ class SubParatranz(ParatrazProject):
             # 0 = 未翻译
             return True
         return False
+
+    @staticmethod
+    def __extractDuplicateKeyText(toExtractDataList: List[dict], keyStr: str) -> Dict[str, int]:
+        """提取重复的字符串以做集中处理，主要针对CSV文本ID。"""
+        result = {}
+        tVar = set()
+        for unit in toExtractDataList:
+            if keyStr in unit and unit[keyStr].strip() != '':
+                if unit[keyStr] in tVar:
+                    result[unit[keyStr]] = 1
+                else:
+                    tVar.add(unit[keyStr])
+        return result
 
 
 if __name__ == '__main__':

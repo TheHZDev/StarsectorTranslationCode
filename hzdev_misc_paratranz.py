@@ -53,7 +53,7 @@ class ParatrazProject:
         self.__paratranzOutputPaths = self.__scanSpecialPath(PARA_TRANZ_PATH)
         self.__localizationOutputPaths = self.__scanSpecialPath(TRANSLATION_PATH)
         self.__config: List[dict] = []
-        self.ImportConfig() # 注册配置文件
+        self.ImportConfig()  # 注册配置文件
         self.__missionProgram = {}
         self.__pathProgram: List[dict] = []
         self.__extProgram: List[dict] = []
@@ -125,10 +125,14 @@ class ParatrazProject:
                     if len(descriptorJSON) * len(missionTextTXT) != 0:
                         if not funcID:
                             self.__makeDirs(paratranzFileName)
-                            self.__executeFunc(self.__missionProgram.get('FromMission'), descriptorJSON, missionTextTXT, paratranzFileName)
+                            self.__executeFunc(self.__missionProgram.get('FromMission'), descriptorJSON, missionTextTXT,
+                                               paratranzFileName)
                         else:
                             if isfile(paratranzFileName):
-                                self.__executeFunc(self.__missionProgram.get('ToMission'), descriptorJSON, missionTextTXT, paratranzFileName, descriptorJSON.replace(ORIGINAL_PATH, TRANSLATION_PATH), missionTextTXT.replace(ORIGINAL_PATH, TRANSLATION_PATH))
+                                self.__executeFunc(self.__missionProgram.get('ToMission'), descriptorJSON,
+                                                   missionTextTXT, paratranzFileName,
+                                                   descriptorJSON.replace(ORIGINAL_PATH, TRANSLATION_PATH),
+                                                   missionTextTXT.replace(ORIGINAL_PATH, TRANSLATION_PATH))
 
     def __dealWithPath(self, filePath: str, funcID: bool = False):
         # 路径处理器
@@ -234,9 +238,9 @@ class ParatrazProject:
             callback_func = getattr(self, funcName)
             if callable(callback_func):
                 # try:
-                    return callback_func(*args)
-                # except:
-                #     return False
+                return callback_func(*args)
+            # except:
+            #     return False
 
     @staticmethod
     def __changeExt(targetPath: str, targetExtName: str):
@@ -279,7 +283,8 @@ class SubParatranz(ParatrazProject):
 
     def ImportOneConfig(self, **kwargs):
         if kwargs.get('Register') == 'mission':
-            self.Config.append({'Register': 'mission', 'FromMission': kwargs.get('FromMission').__name__, 'ToMission': kwargs.get('ToMission').__name__})
+            self.Config.append({'Register': 'mission', 'FromMission': kwargs.get('FromMission').__name__,
+                                'ToMission': kwargs.get('ToMission').__name__})
         else:
             fromOriginal = kwargs.get('FromOriginal')
             toLocalization = kwargs.get('ToLocalization')
@@ -318,22 +323,57 @@ class SubParatranz(ParatrazProject):
         ext = 'ext'
         mission = 'mission'
         self.ImportOneConfig(Register=mission, FromMission=self.inMissions, ToMission=self.outMissions)
+        # 原版 - 代码中的字符串外置文件
         self.ImportOneConfig(Register=path, Path=['/data/strings/strings.json'],
                              FromOriginal=self.inStringsJSON, ToLocalization=self.outStringsJSON)
+        # 原版 - 势力相关配置文件
         self.ImportOneConfig(Register=folder_ext, Folder_Ext=[('/data/world/factions/', 'faction')],
                              FromOriginal=self.inFactions, ToLocalization=self.outFactions)
-        self.ImportOneConfig(Register=path, Path=['/data/strings/tips.json'], FromOriginal=self.inTips,
-                             ToLocalization=self.outTips)
+        # 原版 - 出现在S/L页面和主界面的游戏提示
+        self.ImportOneConfig(Register=path, Path=['/data/strings/tips.json'],
+                             FromOriginal=self.inTips, ToLocalization=self.outTips)
+        # 战斗骚话mod - 相关战斗对话内容
         self.ImportOneConfig(Register=folder_ext, Folder_Ext=[('/data/config/chatter/characters/', 'json')],
                              FromOriginal=self.inChatter, ToLocalization=self.outChatter)
+        # 势力争霸mod - 玩家可选的自定义开局
         self.ImportOneConfig(Register=path, Path=['/data/config/exerelin/customStarts.json'],
                              FromOriginal=self.inCustomStart, ToLocalization=self.outCustomStart)
+        # 原版 - 默认阶层（Rank）相关配置
         self.ImportOneConfig(Register=path, Path=['/data/world/factions/default_ranks.json'],
                              FromOriginal=self.inDefaultRanks, ToLocalization=self.outDefaultRanks)
+        # MagicLib mod - 高价值赏金（HVB）的相关内容
         self.ImportOneConfig(Register=path, Path=['/data/config/modFiles/magicBounty_data.json'],
                              FromOriginal=self.inMagicBountyData, ToLocalization=self.outMagicBountyData)
+        # LunaLib mod - 一些用于在游戏中动态调整mod的数值的mod的相关配置
         self.ImportOneConfig(Register=path, Path=['/data/config/LunaSettings.csv'],
                              FromOriginal=self.inLunaSettings, ToLocalization=self.outLunaSettings)
+        # 势力争霸mod - 势力建立同盟时的名称相关配置
+        self.ImportOneConfig(Register=path, Path=['/data/config/exerelin/allianceNames.json'],
+                             FromOriginal=self.inAllianceNames, ToLocalization=self.outAllianceNames)
+        # 势力争霸mod - 势力间进行外交的相关配置（但主要是处理事件名称和描述）
+        self.ImportOneConfig(Register=path, Path=['/data/config/exerelin/diplomacyConfig.json'],
+                             FromOriginal=self.inDiplomacyConfig, ToLocalization=self.outDiplomacyConfig)
+        # 势力争霸mod - 一个势力在势力争霸环境下所使用的舰队名称和其他特殊信息
+        self.ImportOneConfig(Register=folder_ext, Folder_Ext=[('/data/config/exerelinFactionConfig/', 'json')],
+                             FromOriginal=self.inExerelinFactionConfig, ToLocalization=self.outExerelinFactionConfig)
+        # 星舰传奇mod - 目前只处理一个显示
+        self.ImportOneConfig(Register=path, Path=['/data/config/starship_legends/factionConfigurations.json'],
+                             FromOriginal=self.inFactionConfigurations, ToLocalization=self.outFactionConfigurations)
+        # 原版 - 联络人的相关分类属性
+        self.ImportOneConfig(Register=path, Path=['/data/config/contact_tag_data.json'],
+                             FromOriginal=self.inContactTagData, ToLocalization=self.outContactTagData)
+        # 原版 - 舰船具体配置文件
+        self.ImportOneConfig(Register=folder_ext, Folder_Ext=[('/data/hulls/', 'ship')],
+                             FromOriginal=self.inShipFile, ToLocalization=self.outShipFile)
+        # 原版 - 舰船涂装配置
+        self.ImportOneConfig(Register=folder_ext, Folder_Ext=[('/data/hulls/skins/', 'skin')],
+                             FromOriginal=self.inHullSkinFile, ToLocalization=self.outHullSkinFile)
+        # 工业革命mod - 宠物死因列表
+        self.ImportOneConfig(Register=path, Path=['/data/strings/hamster_death_causes.csv', '/data/strings/combat_death_causes.csv'],
+                             FromOriginal=self.inDeathCauses, ToLocalization=self.outDeathCauses)
+        # 原版 - 自定义天体
+        self.ImportOneConfig(Register=path, Path=['/data/config/custom_entities.json'],
+                             FromOriginal=self.inCustomEntity, ToLocalization=self.outCustomEntity)
 
     # data/missions/*
     def inMissions(self, *args):
@@ -354,11 +394,11 @@ class SubParatranz(ParatrazProject):
             if self.__hasTranslated(unit):
                 if unit.get('key') == 'mission#text':
                     with open(args[4], 'w', encoding='UTF-8') as tFile:
-                        tFile.write(unit.get('translation').replace('\\n', '\n'))
+                        tFile.write(self.__getTranslation(unit))
                 else:
                     realID = unit.get('key').split('#')[1]
                     if realID in tContent:
-                        tContent[realID] = unit.get('translation')
+                        tContent[realID] = self.__getTranslation(unit)
         with open(args[3], 'w', encoding='UTF-8') as tFile:
             json5.dump(tContent, tFile, ensure_ascii=False, indent=4, quote_keys=True)
 
@@ -394,10 +434,10 @@ class SubParatranz(ParatrazProject):
             keyID = unit.get('key', '').split('#')
             if keyID[0] not in result:
                 result[keyID[0]] = {}
-            if self.__hasTranslated(unit) and len(unit.get('translation')) > 0:
-                result.get(keyID[0])[keyID[1]] = unit.get('translation').replace('\\n', '\n')
+            if self.__hasTranslated(unit) and len(self.__getTranslation(unit)) > 0:
+                result.get(keyID[0])[keyID[1]] = self.__getTranslation(unit)
             else:
-                result.get(keyID[0])[keyID[1]] = unit.get('original') # 不至于出现什么missing_string
+                result.get(keyID[0])[keyID[1]] = unit.get('original')  # 不至于出现什么missing_string
         # 处理完成
         with open(args[2], 'w', encoding='UTF-8') as tFile:
             json5.dump(result, tFile, ensure_ascii=False, indent=4, quote_keys=True)
@@ -437,9 +477,9 @@ class SubParatranz(ParatrazProject):
             if not self.__hasTranslated(unit):
                 continue
             keyID: str = unit.get('key')
-            translation: str = unit.get('translation')
+            translation: str = self.__getTranslation(unit)
             if len(translation) == 0:
-                translation = unit.get('original') # 确保始终有数据，不至于直接游戏中报错
+                translation = unit.get('original')  # 确保始终有数据，不至于直接游戏中报错
             if keyID.startswith('root#'):
                 realKey = keyID.split('root#')[1]
                 if realKey in tOriginal:
@@ -486,9 +526,10 @@ class SubParatranz(ParatrazProject):
         for unit in tTranslation:
             if self.__hasTranslated(unit):
                 if '$' not in unit.get('key'):
-                    result['tips'].append(unit.get('translation'))
+                    result['tips'].append(self.__getTranslation(unit))
                 else:
-                    result['tips'].append({'freq': float(unit.get('key').split('$')[1]), 'tip': unit.get('translation')})
+                    result['tips'].append(
+                        {'freq': float(unit.get('key').split('$')[1]), 'tip': self.__getTranslation(unit)})
         tFile = open(args[2], 'w', encoding='UTF-8')
         json5.dump(result, tFile, ensure_ascii=False, indent=4, quote_keys=True)
         tFile.close()
@@ -517,9 +558,9 @@ class SubParatranz(ParatrazProject):
             if self.__hasTranslated(unit):
                 firstKey = unit.get('key').split('$')[1].rpartition('@')[0]
                 if firstKey not in result:
-                    result[firstKey] = [{'text': unit.get('translation')}]
+                    result[firstKey] = [{'text': self.__getTranslation(unit)}]
                 else:
-                    result[firstKey].append({'text': unit.get('translation')})
+                    result[firstKey].append({'text': self.__getTranslation(unit)})
         tOriginal.update({'lines': result})
         with open(args[2], 'w', encoding='UTF-8') as tFile:
             json5.dump(tOriginal, tFile, ensure_ascii=False, indent=4, quote_keys=True)
@@ -546,9 +587,71 @@ class SubParatranz(ParatrazProject):
             if self.__hasTranslated(unit):
                 unitID, unitKey = unit.get('key').split('#')
                 if unitID in tOriginal:
-                    tOriginal[unitID][unitKey] = unit.get('translation').replace('\\n', '\n')
+                    tOriginal[unitID][unitKey] = self.__getTranslation(unit)
         with open(args[2], 'w', encoding='UTF-8') as tFile:
             json5.dump({'starts': list(tOriginal.values())}, tFile, ensure_ascii=False, indent=4, quote_keys=True)
+
+    # data/config/exerelin/allianceNames.json
+    def inAllianceNames(self, *args):
+        with open(args[0], encoding='UTF-8') as tFile:
+            tOriginal: Dict[str, Dict[str, Dict[str, List[str]]]] = json5.loads(self.__filterJSON5(tFile.read()))
+        result = []
+        for firstKey in tOriginal.keys():
+            for secondKey in tOriginal[firstKey].keys():
+                for thirdKey in tOriginal[firstKey][secondKey].keys():
+                    t1 = tOriginal[firstKey][secondKey][thirdKey]
+                    if isinstance(t1, list):
+                        for i in range(len(t1)):
+                            result.append(self.__buildDict(f"{firstKey}#{secondKey}${thirdKey}%{i + 1}", t1[i],
+                                                           f"当势力 {secondKey}与{thirdKey} 结盟时，可选的默认名字之一"))
+        self.__writeParatranzJSON(result, args[1])
+
+    def outAllianceNames(self, *args):
+        tResult = {}
+        for unit in self.__readParatranzJSON(args[1]):
+            if self.__hasTranslated(unit):
+                firstKey, t1 = unit.get('key').split('#')
+                secondKey, thirdKey = t1.split('$')
+                if '%' in thirdKey:
+                    thirdKey = thirdKey.split('%')[0]
+                if firstKey not in tResult:
+                    tResult[firstKey] = {}
+                if secondKey not in tResult[firstKey]:
+                    tResult[firstKey][secondKey] = {}
+                if thirdKey not in tResult[firstKey][secondKey]:
+                    tResult[firstKey][secondKey][thirdKey] = [self.__getTranslation(unit)]
+                else:
+                    tResult[firstKey][secondKey][thirdKey].append(self.__getTranslation(unit))
+        with open(args[2], 'w', encoding='UTF-8') as tFile:
+            json5.dump(tResult, tFile, ensure_ascii=False, indent=4, quote_keys=True)
+
+    # data/config/exerelin/diplomacyConfig.json
+    def inDiplomacyConfig(self, *args):
+        # 只处理event区块
+        with open(args[0], encoding="UTF-8") as tFile:
+            tOriginal: List[dict] = json5.loads(self.__filterJSON5(tFile.read()))['events']
+        result = []
+        for eventUnit in tOriginal:
+            stageID = eventUnit.get('stage')
+            result.append(
+                self.__buildDict(f'event#{stageID}$name', eventUnit.get('name'), "外交事件：\n" + str(eventUnit)))
+            result.append(
+                self.__buildDict(f'event#{stageID}$desc', eventUnit.get('desc'), "外交事件：\n" + str(eventUnit)))
+        self.__writeParatranzJSON(result, args[1])
+
+    def outDiplomacyConfig(self, *args):
+        with open(args[0], encoding='UTF-8') as tFile:
+            tOriginal: dict = json5.loads(self.__filterJSON5(tFile.read()))
+        tEvent: List[dict] = tOriginal['events']
+        for unit in self.__readParatranzJSON(args[1]):
+            if self.__hasTranslated(unit):
+                stageID, unitKey = unit.get('key').split('#')[1].split('$')
+                for stageUnit in tEvent:
+                    if stageUnit.get('stage') == stageID:
+                        stageUnit[unitKey] = self.__getTranslation(unit)
+                        break
+        with open(args[2], 'w', encoding='UTF-8') as tFile:
+            json5.dump(tOriginal, tFile, ensure_ascii=False, indent=4, quote_keys=True)
 
     # data/world/factions/default_ranks.json
     def inDefaultRanks(self, *args):
@@ -559,7 +662,8 @@ class SubParatranz(ParatrazProject):
             for secondKey in tOriginal[firstKey].keys():
                 for thirdKey in tOriginal[firstKey][secondKey].keys():
                     if isinstance(tOriginal[firstKey][secondKey][thirdKey], str):
-                        result.append(self.__buildDict(f'{firstKey}#{secondKey}${thirdKey}', tOriginal[firstKey][secondKey][thirdKey]))
+                        result.append(self.__buildDict(f'{firstKey}#{secondKey}${thirdKey}',
+                                                       tOriginal[firstKey][secondKey][thirdKey]))
         self.__writeParatranzJSON(result, args[1])
 
     def outDefaultRanks(self, *args):
@@ -569,8 +673,9 @@ class SubParatranz(ParatrazProject):
             if self.__hasTranslated(unit):
                 firstKey, tVar = unit.get('key').split('#')
                 secondKey, thirdKey = tVar.split('$')
-                if firstKey in tOriginal.keys() and secondKey in tOriginal[firstKey].keys() and thirdKey in tOriginal[firstKey][secondKey]:
-                    tOriginal[firstKey][secondKey][thirdKey] = unit.get('translation')
+                if firstKey in tOriginal.keys() and secondKey in tOriginal[firstKey].keys() and thirdKey in \
+                        tOriginal[firstKey][secondKey]:
+                    tOriginal[firstKey][secondKey][thirdKey] = self.__getTranslation(unit)
         with open(args[2], 'w', encoding='UTF-8') as tFile:
             json5.dump(tOriginal, tFile, ensure_ascii=False, indent=4, quote_keys=True)
 
@@ -581,26 +686,187 @@ class SubParatranz(ParatrazProject):
             tOriginal: Dict[str, dict] = json5.loads(self.__filterJSON5(tFile.read()))
         result = []
         for bountyID in tOriginal:
-            for paraName in ('job_name', 'job_description', 'job_comm_reply', 'job_intel_success', 'job_intel_failure', 'fleet_name', 'fleet_flagship_name'):
+            for paraName in ('job_name', 'job_description', 'job_comm_reply', 'job_intel_success', 'job_intel_failure',
+                             'fleet_name', 'fleet_flagship_name'):
                 if paraName in tOriginal[bountyID]:
-                    result.append(self.__buildDict(f'{bountyID}#{paraName}', tOriginal[bountyID].get(paraName)))
+                    result.append(self.__buildDict(f'{bountyID}#{paraName}', tOriginal[bountyID].get(paraName), f'[本行原始数据]\n{pprint.pformat(tOriginal[bountyID], sort_dicts=False)}'))
         self.__writeParatranzJSON(result, args[1])
 
     def outMagicBountyData(self, *args):
-        tTranslation = self.__readParatranzJSON(args[1])
-        # 读取内容
-        result = {}
-        for unit in tTranslation:
-            keyID = unit.get('key').split('#')
-            if keyID[0] not in result:
-                continue
-            if self.__hasTranslated(unit) and len(unit.get('translation')) > 0:
-                result.get(keyID[0])[keyID[1]] = unit.get('translation').replace('\\n', '\n')
-            else:
-                result.get(keyID[0])[keyID[1]] = unit.get('original')
-        # 处理完成
+        self.__commonTranslateFunc_v2(*args)
+
+    # data/config/exerelinFactionConfig/*.json
+    def inExerelinFactionConfig(self, *args):
+        toTranslateKeys = ('ngcTooltip', 'rebelFleetSuffix', 'asteroidMiningFleetName', 'gasMiningFleetName',
+                           'invasionFleetName', 'responseFleetName', 'invasionSupportFleetName', 'defenceFleetName',
+                           'suppressionFleetName', 'vengeanceLevelNames', 'vengeanceFleetNames', 'vengeanceFleetNamesSingle')
+        with open(args[0], encoding='UTF-8') as tFile:
+            tOriginal: dict = json5.loads(self.__filterJSON5(tFile.read()))
+        result = []
+        for translateKey in toTranslateKeys:
+            if translateKey in tOriginal:
+                if isinstance(tOriginal.get(translateKey), str):
+                    result.append(self.__buildDict(translateKey, tOriginal.get(translateKey)))
+                elif isinstance(tOriginal.get(translateKey), list):
+                    for unitID in range(len(tOriginal.get(translateKey))):
+                        if isinstance(tOriginal.get(translateKey)[unitID], str):
+                            result.append(self.__buildDict(f'{translateKey}${unitID}', tOriginal.get(translateKey)[unitID]))
+        self.__writeParatranzJSON(result, args[1])
+
+    def outExerelinFactionConfig(self, *args):
+        with open(args[0], encoding='UTF-8') as tFile:
+            tOriginal: dict = json5.loads(self.__filterJSON5(tFile.read()))
+        for unit in self.__readParatranzJSON(args[1]):
+            if self.__hasTranslated(unit):
+                if unit.get('key') in tOriginal:
+                    tOriginal[unit.get('key')] = self.__getTranslation(unit)
+                elif '$' in unit.get('key'):  # 单层数组替换操作
+                    first, second = unit.get('key').split('$')
+                    if first in tOriginal:
+                        tOriginal[first][int(second)] = self.__getTranslation(unit)
         with open(args[2], 'w', encoding='UTF-8') as tFile:
-            json5.dump(result, tFile, ensure_ascii=False, indent=4, quote_keys=True)
+            json5.dump(tOriginal, tFile, ensure_ascii=False, indent=4, quote_keys=True)
+
+    # data/config/starship_legends/factionConfigurations.json
+    def inFactionConfigurations(self, *args):
+        # 一看就是星舰传奇的玩意
+        with open(args[0], encoding='UTF-8') as tFile:
+            tOriginal: Dict[str, dict] = json5.loads(self.__filterJSON5(tFile.read()))
+        result = []
+        for firstKey in tOriginal:
+            if 'descriptionOverride' in tOriginal[firstKey].keys():
+                result.append(
+                    self.__buildDict(f'{firstKey}#descriptionOverride', tOriginal[firstKey]['descriptionOverride']))
+        self.__writeParatranzJSON(result, args[1])
+
+    def outFactionConfigurations(self, *args):
+        self.__commonTranslateFunc_v2(*args)
+
+    # data/config/contact_tag_data.json
+    def inContactTagData(self, *args):
+        with open(args[0], encoding='UTF-8') as tFile:
+            tOriginal: Dict[str, dict] = json5.loads(self.__filterJSON5(tFile.read()))
+        result = []
+        for firstKey in tOriginal:
+            if 'name' in tOriginal[firstKey]:
+                result.append(self.__buildDict(f'{firstKey}#name', tOriginal[firstKey]['name']))
+        self.__writeParatranzJSON(result, args[1])
+
+    def outContactTagData(self, *args):
+        self.__commonTranslateFunc_v2(*args)
+
+    # data/hulls/*.ship
+    def inShipFile(self, *args):
+        with open(args[0], encoding='UTF-8') as tFile:
+            tOriginal: dict = json5.loads(self.__filterJSON5(tFile.read()))
+        result = []
+        if 'hullName' in tOriginal:
+            result.append(self.__buildDict(f'root#hullName', tOriginal['hullName'], f'[本行原始数据]\n{pprint.pformat(tOriginal, sort_dicts=False)}'))
+        self.__writeParatranzJSON(result, args[1])
+
+    def outShipFile(self, *args):
+        self.__commonTranslateFunc_v1(*args)
+
+    # data/hulls/skins/*.skin
+    def inHullSkinFile(self, *args):
+        with open(args[0], encoding='UTF-8') as tFile:
+            tOriginal: dict = json5.loads(self.__filterJSON5(tFile.read()))
+        result = []
+        for keyStr in ('hullName', 'descriptionPrefix'):
+            if keyStr in tOriginal:
+                result.append(self.__buildDict(f'root#{keyStr}', tOriginal[keyStr], f'[本行原始数据]\n{pprint.pformat(tOriginal, sort_dicts=False)}'))
+        self.__writeParatranzJSON(result, args[1])
+
+    def outHullSkinFile(self, *args):
+        self.__commonTranslateFunc_v1(*args)
+
+    # data/strings/combat_death_causes.csv 和 data/strings/hamster_death_causes.csv
+    # 处理宠物系统的死因描述
+    def inDeathCauses(self, *args):
+        result = []
+        with open(args[0], encoding='UTF-8') as tFile:
+            textID = 1
+            for line in list(csv.DictReader(tFile)):
+                contextText = None
+                if 'combat' in args[0]:
+                    contextText = '该宠物在战斗中与被毁舰船一起共存亡了'
+                elif 'hamster' in args[0]:
+                    contextText = '这是一只hamster（仓鼠），自然死亡时的死因描述'
+                result.append(self.__buildDict(f'id#{textID}', line['id'], contextText))
+                textID += 1
+        self.__writeParatranzJSON(result, args[1])
+
+    def outDeathCauses(self, *args):
+        result = []
+        for unit in self.__readParatranzJSON(args[1]):
+            if self.__hasTranslated(unit):
+                result.append({'id': self.__getTranslation(unit)})
+        with open(args[2], 'w', newline='', encoding='UTF-8') as tFile:
+            tVar = csv.DictWriter(tFile, list(result[0].keys()))
+            tVar.writeheader()
+            tVar.writerows(result)
+
+    # data/config/custom_entities.json
+    def inCustomEntity(self, *args):
+        with open(args[0], encoding='UTF-8') as tFile:
+            preContent = self.__filterJSON5(tFile.read()).splitlines()
+            for lineID in range(len(preContent)):
+                lineStr = preContent[lineID].strip()
+                if lineStr.startswith('//') or lineStr.startswith('#'):
+                    continue
+                if lineStr.startswith('"layers"'):
+                    tVar = lineStr if '//' not in lineStr else lineStr.partition('//')[0]
+                    # 预处理
+                    tVar3 = tVar.replace('"layers"', '').replace(':', '').strip()
+                    if tVar3.endswith(','):
+                        tVar3 = tVar3[:-1]
+                    tVar3 = tVar3.strip()
+                    tVar2 = []
+                    if ',' in tVar3:
+                        for unit in tVar3.replace('[', '').replace(']', '').split(','):
+                            tVar2.append(unit.strip())
+                    else:
+                        tVar2.append(tVar3[1:-1])
+                    preContent[lineID] = lineStr.replace(tVar3, json.dumps(tVar2, ensure_ascii=False))
+            tOriginal: dict = json5.loads('\n'.join(preContent))
+        result = []
+        for firstKey in tOriginal:
+            secondDict: dict = tOriginal[firstKey]
+            for unit in ('defaultName', 'nameInText', 'shortName', 'aOrAn', 'isOrAre'):
+                if unit in secondDict:
+                    result.append(self.__buildDict(f'{firstKey}#{unit}', secondDict[unit], f'[本行原始数据]\n{pprint.pformat(secondDict, sort_dicts=False)}'))
+        self.__writeParatranzJSON(result, args[1])
+
+    def outCustomEntity(self, *args):
+        import hashlib, base64
+        const_hash = hashlib.md5(args[0].encode('utf-8')).hexdigest()
+        with open(args[0], encoding='UTF-8') as tFile:
+            preContent = self.__filterJSON5(tFile.read()).splitlines()
+            for lineID in range(len(preContent)):
+                lineStr = preContent[lineID].strip()
+                if lineStr.startswith('//') or lineStr.startswith('#'):
+                    continue
+                if lineStr.startswith('"layers"'): # 输出翻译时不需要考虑这行的内容，只需要之后输出后再替换回来就行
+                    tVar = base64.b64encode((lineStr if '//' not in lineStr else lineStr.partition('//')[0]).strip().encode('UTF-8')).decode()
+                    preContent[lineID] = f'"{const_hash}": "{tVar}"'
+            tOriginal: dict = json5.loads('\n'.join(preContent))
+        for unit in self.__readParatranzJSON(args[1]):
+            if self.__hasTranslated(unit):
+                firstKey, secondKey = unit.get('key').split('#')
+                if firstKey in tOriginal:
+                    tOriginal[firstKey][secondKey] = self.__getTranslation(unit)
+        preResult: str = json5.dumps(tOriginal, ensure_ascii=False, indent=4, quote_keys=True)
+        preResult_Group = preResult.splitlines()
+        for lineID in range(len(preResult_Group)):
+            lineStr = preResult_Group[lineID]
+            if lineStr.strip().startswith(f'"{const_hash}"'):
+                # 剥离出来后就可以替换掉了
+                originalContent = base64.b64decode(lineStr.replace(const_hash, '').replace('"', '').replace(':', '').strip().encode()).decode('UTF-8')
+                if not originalContent.endswith(','):
+                    originalContent += ','
+                preResult_Group[lineID] = originalContent
+        with open(args[2], 'w', encoding='UTF-8') as tFile:
+            tFile.write('\r\n'.join(preResult_Group))
 
     # data/config/LunaSettings.csv
     # 本来这个文件应该交给汉化组写的脚本处理，但是由于某些原因……
@@ -611,7 +877,7 @@ class SubParatranz(ParatrazProject):
             tVar1 = self.__extractDuplicateKeyText(tVar, 'fieldID')  # 预提取重复的ID信息数据
             for tabUnit in self.__extractDuplicateKeyText(tVar, 'tab').keys():
                 if tabUnit != '':
-                    result.append(self.__buildDict(f'tabValue${len(result)+1}', tabUnit, '分类页数据'))
+                    result.append(self.__buildDict(f'tabValue${len(result) + 1}', tabUnit, '这个是Tab页的标签头'))
             for lineDict in tVar:
                 line_FieldID = lineDict['fieldID']
                 extraNumber = ''
@@ -621,35 +887,46 @@ class SubParatranz(ParatrazProject):
                     if line_FieldID in tVar1:  # 需要特别关照的重复键值将打上不同的ID，以便paratranz能认出来
                         extraNumber = f'${tVar1[line_FieldID]}'
                         tVar1[line_FieldID] += 1
-                    result.append(self.__buildDict(f'{line_FieldID}#defaultValue{extraNumber}', lineDict['defaultValue'], f'[本行原始数据]\n{pprint.pformat(lineDict, sort_dicts=False)}'))
+                    result.append(
+                        self.__buildDict(f'{line_FieldID}#defaultValue{extraNumber}', lineDict['defaultValue'],
+                                         f'[本行原始数据]\n{pprint.pformat(lineDict, sort_dicts=False)}'))
                 else:
                     for keyStr in ('fieldName', 'fieldDescription'):
                         if keyStr in lineDict and lineDict[keyStr].strip() != '':
                             if line_FieldID in tVar1:
                                 extraNumber = f'${tVar1[line_FieldID]}'
                                 tVar1[line_FieldID] += 1
-                            result.append(self.__buildDict('{0}#{1}{2}'.format( line_FieldID, keyStr, extraNumber),
-                                                           lineDict[keyStr], f'[本行原始数据]\n{pprint.pformat(lineDict, sort_dicts=False)}'))
+                            result.append(self.__buildDict('{0}#{1}{2}'.format(line_FieldID, keyStr, extraNumber),
+                                                           lineDict[keyStr],
+                                                           f'[本行原始数据]\n{pprint.pformat(lineDict, sort_dicts=False)}'))
         self.__writeParatranzJSON(result, args[1])
 
     def outLunaSettings(self, *args):
         # 读取内容
         with open(args[0], encoding='UTF-8') as tFile:
             result = list(csv.DictReader(tFile))
-        for unit in self.__readParatranzJSON(args[1]):
+        tVar_data = self.__readParatranzJSON(args[1])
+        for unit in tVar_data:  # 批量替换标签数据
+            if 'tabValue$' in unit.get('key') and self.__hasTranslated(unit):
+                for line in result:
+                    if 'tab' in line and line['tab'] == unit.get('original'):
+                        line['tab'] = self.__getTranslation(unit)
+        for unit in tVar_data:
+            if 'tabValue$' in unit.get('key'):  # 不扫描特定数据
+                continue
             csvKeyID, csvValueKeyID = unit.get('key').split('#')
             if '$' in csvValueKeyID:
                 csvValueKeyID = csvValueKeyID.split('$')[0]  # 重复的键值会额外比较原文是否相符
                 for line in result:
                     if line['fieldID'] == csvKeyID and line[csvValueKeyID] == unit.get('original'):
-                        if self.__hasTranslated(unit) and len(unit.get('translation')) > 0:
-                            line[csvValueKeyID] = unit.get('translation')
+                        if self.__hasTranslated(unit) and len(self.__getTranslation(unit)) > 0:
+                            line[csvValueKeyID] = self.__getTranslation(unit)
                             break
             else:
                 for line in result:
                     if line['fieldID'] == csvKeyID:
-                        if self.__hasTranslated(unit) and len(unit.get('translation')) > 0:
-                            line[csvValueKeyID] = unit.get('translation')
+                        if self.__hasTranslated(unit) and len(self.__getTranslation(unit)) > 0:
+                            line[csvValueKeyID] = self.__getTranslation(unit)
                             break
         with open(args[2], 'w', newline='', encoding='UTF-8') as tFile:
             tVar = csv.DictWriter(tFile, list(result[0].keys()))
@@ -665,8 +942,8 @@ class SubParatranz(ParatrazProject):
             if f'{number}f' in fileContent:
                 fileContent.replace(f'{number}f', str(number))
         tVar = []
-        replace1 = re.compile('[^\\\\]",? *#')  # strings.json定位
-        replace2 = re.compile('(\\d|true|false),? *#')  # 通用定位数据
+        replace1 = re.compile('[^\\\\]",?[ \t]*#')  # strings.json定位
+        replace2 = re.compile('(\\d|true|false|]|}|\[),?[ \t]*#')  # 通用定位数据
         for line in fileContent.splitlines():
             line = line.strip()
             if line.startswith('#') or len(line) == 0:
@@ -679,7 +956,7 @@ class SubParatranz(ParatrazProject):
                     line = line.replace(toReplace, '" //')
             elif replace2.search(line) is not None:
                 tStr = replace2.search(line).group()
-                line = line.replace(tStr, tStr[:-1]+'//')
+                line = line.replace(tStr, tStr[:-1] + '//')
             tVar.append(line)
         return '\n'.join(tVar)
 
@@ -712,6 +989,34 @@ class SubParatranz(ParatrazProject):
             # 0 = 未翻译
             return True
         return False
+
+    @staticmethod
+    def __getTranslation(toGet: dict):
+        return toGet.get('translation').replace('\\n', '\n')
+
+    def __commonTranslateFunc_v1(self, *args):
+        """提供一些只有一层json的翻译函数。"""
+        with open(args[0], encoding='UTF-8') as tFile:
+            tOriginal: Dict[str, dict] = json5.loads(self.__filterJSON5(tFile.read()))
+        for unit in self.__readParatranzJSON(args[1]):
+            if self.__hasTranslated(unit):
+                keyStr = unit.get('key').split('#')[1]
+                if keyStr in tOriginal:
+                    tOriginal[keyStr] = self.__getTranslation(unit)
+        with open(args[2], 'w', encoding='UTF-8') as tFile:
+            json5.dump(tOriginal, tFile, ensure_ascii=False, indent=4, quote_keys=True)
+
+    def __commonTranslateFunc_v2(self, *args):
+        """2层json时使用。"""
+        with open(args[0], encoding='UTF-8') as tFile:
+            tOriginal: Dict[str, dict] = json5.loads(self.__filterJSON5(tFile.read()))
+        for unit in self.__readParatranzJSON(args[1]):
+            if self.__hasTranslated(unit):
+                firstKey, secondKey = unit.get('key').split('#')
+                if firstKey in tOriginal and secondKey in tOriginal[firstKey]:
+                    tOriginal[firstKey][secondKey] = self.__getTranslation(unit)
+        with open(args[2], 'w', encoding='UTF-8') as tFile:
+            json5.dump(tOriginal, tFile, ensure_ascii=False, indent=4, quote_keys=True)
 
     @staticmethod
     def __extractDuplicateKeyText(toExtractDataList: List[dict], keyStr: str) -> Dict[str, int]:

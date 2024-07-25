@@ -4,6 +4,7 @@ from os.path import isfile, isdir
 from typing import List, Dict
 import re
 import csv
+from hashlib import md5
 
 import json
 import json5
@@ -83,8 +84,11 @@ class ParatrazProject:
                     self.__allProgram.append(program)
 
     def Start(self):
-        print('Paratranz 项目助手', '1 - 从原始和汉化文件导出 ParaTranz 词条',
+        print('Paratranz 项目助手',
+              '1 - 从原始和汉化文件导出 ParaTranz 词条',
               '2 - 将 ParaTranz 词条写回汉化文件(localization)',
+              '3 - 为 para_tranz_script.py 生成配置文件',
+              '其它任意键 - 退出',
               sep='\n')
         userSelect = input('请输入您的选择：').strip()
         if userSelect == '1':
@@ -105,6 +109,10 @@ class ParatrazProject:
                     continue
             self.__dealWithMission(True)
             print('译文文件解析完毕。')
+        elif userSelect == '3':
+            from makeParaTranzConfig import preStartConfirm, makeConfigFile
+
+            makeConfigFile(ORIGINAL_PATH, self.__originalFilePaths, **preStartConfirm())
 
     def __dealWithMission(self, funcID: bool = False):
         """战役系统处理器"""
@@ -322,6 +330,7 @@ class SubParatranz(ParatrazProject):
         folder_ext = 'folder_ext'
         ext = 'ext'
         mission = 'mission'
+        # 原版 - 战役外置文件的统一处理模块
         self.ImportOneConfig(Register=mission, FromMission=self.inMissions, ToMission=self.outMissions)
         # 原版 - 代码中的字符串外置文件
         self.ImportOneConfig(Register=path, Path=['/data/strings/strings.json'],
@@ -362,9 +371,9 @@ class SubParatranz(ParatrazProject):
         # 原版 - 联络人的相关分类属性
         self.ImportOneConfig(Register=path, Path=['/data/config/contact_tag_data.json'],
                              FromOriginal=self.inContactTagData, ToLocalization=self.outContactTagData)
-        # 原版 - 舰船具体配置文件
-        self.ImportOneConfig(Register=folder_ext, Folder_Ext=[('/data/hulls/', 'ship')],
-                             FromOriginal=self.inShipFile, ToLocalization=self.outShipFile)
+        # 原版 - 舰船具体配置文件（231229：经向猫猫询问得知，该部分无需翻译）
+        # self.ImportOneConfig(Register=folder_ext, Folder_Ext=[('/data/hulls/', 'ship')],
+        #                      FromOriginal=self.inShipFile, ToLocalization=self.outShipFile)
         # 原版 - 舰船涂装配置
         self.ImportOneConfig(Register=folder_ext, Folder_Ext=[('/data/hulls/skins/', 'skin')],
                              FromOriginal=self.inHullSkinFile, ToLocalization=self.outHullSkinFile)
@@ -404,24 +413,22 @@ class SubParatranz(ParatrazProject):
 
     # data/strings/strings.json
     def inStringsJSON(self, *args):
-        tFile = open(args[0], encoding='UTF-8')
-        tFileContent = tFile.read()
-        tFile.close()
+        with open(args[0], encoding='UTF-8') as tFile:
+            tFileContent = self.__filterJSON5(tFile.read())
         # 读取JSON
         commentCode = {}
+        searchHint = re.compile('[^\\\\]",?[ \t]*//')
         for line in tFileContent.splitlines():
-            if '#' in line and '\"' in line:
-                commentCode[line.split('\"')[1]] = line.strip().rpartition('#')[2]
-            elif '//' in line and '\"' in line:
-                commentCode[line.split('\"')[1]] = line.strip().rpartition('//')[2]
+            if '\"' in line and searchHint.search(line) is not None:
+                commentCode[line.split('\"')[1]] = line[searchHint.search(line).end():].strip()
         # 解析注释完成
-        originalJSON5: Dict[str, Dict[str, str]] = json5.loads(self.__filterJSON5(tFileContent))
+        originalJSON5: Dict[str, Dict[str, str]] = json5.loads(tFileContent)
         result = []
         for firstKey in originalJSON5.keys():
             for secondKey in originalJSON5.get(firstKey).keys():
                 lineConfig = self.__buildDict(f'{firstKey}#{secondKey}', originalJSON5[firstKey][secondKey])
                 if secondKey in commentCode:
-                    lineConfig['context'] = commentCode.pop(secondKey)
+                    lineConfig['context'] = commentCode.pop(secondKey).strip()
                 result.append(lineConfig)
         # 写入文件
         self.__writeParatranzJSON(result, args[1])
@@ -511,13 +518,12 @@ class SubParatranz(ParatrazProject):
         tFile.close()
         # 读取原文文件内容
         result = []
-        countID = 1
-        for strUnit in tOriginal.get('tips'):
+        fastMD5 = lambda s : md5(s.encode('UTF-8')).hexdigest()
+        for strUnit in tOriginal.get('tips'):  # 以原文MD5作为唯一key，从而规避掉顺序改变引起的Paratranz重复劳动
             if isinstance(strUnit, str):
-                result.append(self.__buildDict(f'tips#{countID}', strUnit))
+                result.append(self.__buildDict(f'tips#{fastMD5(strUnit)}', strUnit))
             elif isinstance(strUnit, dict):
-                result.append(self.__buildDict(f'tips#{countID}${strUnit.get("freq")}', strUnit.get('tip')))
-            countID += 1
+                result.append(self.__buildDict(f'tips#{fastMD5(strUnit.get("tip"))}${strUnit.get("freq")}', strUnit.get('tip')))
         self.__writeParatranzJSON(result, args[1])
 
     def outTips(self, *args):
@@ -571,7 +577,7 @@ class SubParatranz(ParatrazProject):
             tContent: List[dict] = json5.loads(self.__filterJSON5(tFile.read()))['starts']
         result = []
         for unit in tContent:
-            unitID = unit.get('key')
+            unitID = unit.get('id')
             result.append(self.__buildDict(f'{unitID}#name', unit.get('name')))
             result.append(self.__buildDict(f'{unitID}#difficulty', unit.get('difficulty')))
             result.append(self.__buildDict(f'{unitID}#desc', unit.get('desc')))
@@ -772,7 +778,7 @@ class SubParatranz(ParatrazProject):
         with open(args[0], encoding='UTF-8') as tFile:
             tOriginal: dict = json5.loads(self.__filterJSON5(tFile.read()))
         result = []
-        for keyStr in ('hullName', 'descriptionPrefix'):
+        for keyStr in ('hullName', 'descriptionPrefix', 'tech'):
             if keyStr in tOriginal:
                 result.append(self.__buildDict(f'root#{keyStr}', tOriginal[keyStr], f'[本行原始数据]\n{pprint.pformat(tOriginal, sort_dicts=False)}'))
         self.__writeParatranzJSON(result, args[1])
@@ -833,7 +839,7 @@ class SubParatranz(ParatrazProject):
         for firstKey in tOriginal:
             secondDict: dict = tOriginal[firstKey]
             for unit in ('defaultName', 'nameInText', 'shortName', 'aOrAn', 'isOrAre'):
-                if unit in secondDict:
+                if unit in secondDict and len(secondDict[unit]) > 0:
                     result.append(self.__buildDict(f'{firstKey}#{unit}', secondDict[unit], f'[本行原始数据]\n{pprint.pformat(secondDict, sort_dicts=False)}'))
         self.__writeParatranzJSON(result, args[1])
 
@@ -848,7 +854,7 @@ class SubParatranz(ParatrazProject):
                     continue
                 if lineStr.startswith('"layers"'): # 输出翻译时不需要考虑这行的内容，只需要之后输出后再替换回来就行
                     tVar = base64.b64encode((lineStr if '//' not in lineStr else lineStr.partition('//')[0]).strip().encode('UTF-8')).decode()
-                    preContent[lineID] = f'"{const_hash}": "{tVar}"'
+                    preContent[lineID] = f'"{const_hash}": "{tVar}",'
             tOriginal: dict = json5.loads('\n'.join(preContent))
         for unit in self.__readParatranzJSON(args[1]):
             if self.__hasTranslated(unit):
@@ -861,12 +867,12 @@ class SubParatranz(ParatrazProject):
             lineStr = preResult_Group[lineID]
             if lineStr.strip().startswith(f'"{const_hash}"'):
                 # 剥离出来后就可以替换掉了
-                originalContent = base64.b64decode(lineStr.replace(const_hash, '').replace('"', '').replace(':', '').strip().encode()).decode('UTF-8')
+                originalContent = '        ' + base64.b64decode(lineStr.replace(const_hash, '').replace('"', '').replace(':', '').strip().encode()).decode('UTF-8')
                 if not originalContent.endswith(','):
                     originalContent += ','
                 preResult_Group[lineID] = originalContent
         with open(args[2], 'w', encoding='UTF-8') as tFile:
-            tFile.write('\r\n'.join(preResult_Group))
+            tFile.write('\n'.join(preResult_Group))
 
     # data/config/LunaSettings.csv
     # 本来这个文件应该交给汉化组写的脚本处理，但是由于某些原因……
@@ -879,23 +885,29 @@ class SubParatranz(ParatrazProject):
                 if tabUnit != '':
                     result.append(self.__buildDict(f'tabValue${len(result) + 1}', tabUnit, '这个是Tab页的标签头'))
             for lineDict in tVar:
-                line_FieldID = lineDict['fieldID']
+                line_FieldID: str = lineDict['fieldID']
+                if line_FieldID.strip().startswith('#'):
+                    continue
                 extraNumber = ''
                 if line_FieldID == '':
                     continue
+                if line_FieldID in tVar1: # 需要特别关照的重复键值将打上不同的ID，以便paratranz能认出来
+                    extraNumber = f'${tVar1[line_FieldID]}'
+                    tVar1[line_FieldID] += 1
                 if lineDict['fieldType'] in ('Header', 'Text'):  # 检测到特殊头部信息
-                    if line_FieldID in tVar1:  # 需要特别关照的重复键值将打上不同的ID，以便paratranz能认出来
-                        extraNumber = f'${tVar1[line_FieldID]}'
-                        tVar1[line_FieldID] += 1
                     result.append(
                         self.__buildDict(f'{line_FieldID}#defaultValue{extraNumber}', lineDict['defaultValue'],
                                          f'[本行原始数据]\n{pprint.pformat(lineDict, sort_dicts=False)}'))
+                elif lineDict['fieldType'] == 'Radio': # 字符串单选数据特别处理
+                    for keyStr in ('fieldName', 'fieldDescription', 'defaultValue'):
+                        if keyStr in lineDict and lineDict[keyStr].strip() != '':
+                            result.append(self.__buildDict('{0}#{1}{2}'.format(line_FieldID, keyStr, extraNumber),
+                                                           lineDict[keyStr],
+                                                           f'[本行原始数据]\n{pprint.pformat(lineDict, sort_dicts=False)}'))
+                    result.append(self.__buildDict('{0}#{1}{2}'.format(line_FieldID, 'secondaryValue', extraNumber), lineDict['secondaryValue'], f'注意：请在翻译时保留英文逗号，它是数据之间的分割线！如果一定要使用逗号，特别允许使用中文逗号！\n[本行原始数据]\n{pprint.pformat(lineDict, sort_dicts=False)}'))
                 else:
                     for keyStr in ('fieldName', 'fieldDescription'):
                         if keyStr in lineDict and lineDict[keyStr].strip() != '':
-                            if line_FieldID in tVar1:
-                                extraNumber = f'${tVar1[line_FieldID]}'
-                                tVar1[line_FieldID] += 1
                             result.append(self.__buildDict('{0}#{1}{2}'.format(line_FieldID, keyStr, extraNumber),
                                                            lineDict[keyStr],
                                                            f'[本行原始数据]\n{pprint.pformat(lineDict, sort_dicts=False)}'))
@@ -940,7 +952,7 @@ class SubParatranz(ParatrazProject):
             fileContent = fileContent[:-1]
         for number in range(10):
             if f'{number}f' in fileContent:
-                fileContent.replace(f'{number}f', str(number))
+                fileContent = fileContent.replace(f'{number}f', str(number))
         tVar = []
         replace1 = re.compile('[^\\\\]",?[ \t]*#')  # strings.json定位
         replace2 = re.compile('(\\d|true|false|]|}|\[),?[ \t]*#')  # 通用定位数据

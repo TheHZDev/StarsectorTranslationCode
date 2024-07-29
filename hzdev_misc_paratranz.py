@@ -399,6 +399,9 @@ class SubParatranz(ParatrazProject):
         # 原版 - 自定义天体
         self.ImportOneConfig(Register=path, Path=['/data/config/custom_entities.json'],
                              FromOriginal=self.inCustomEntity, ToLocalization=self.outCustomEntity)
+        # 原版 - Mod简介
+        self.ImportOneConfig(Register=path, Path=['/mod_info.json'],
+                             FromOriginal=self.inModInfo, ToLocalization=self.outModInfo)
 
     # data/missions/*
     def inMissions(self, *args):
@@ -942,6 +945,19 @@ class SubParatranz(ParatrazProject):
             tVar = csv.DictWriter(tFile, list(result[0].keys()))
             tVar.writeheader()
             tVar.writerows(result)
+
+    # mod_info.json
+    def inModInfo(self, *args):
+        with open(args[0], encoding='UTF-8') as tFile:
+            tOriginal: dict = json5.loads(self.__filterJSON5(tFile.read()))
+        result = []
+        hintBox = {'name': '本Mod的名称', 'description': '本mod的描述'}
+        for unitKey in hintBox:
+            result.append(self.__buildDict(f'root#{unitKey}', tOriginal[unitKey], hintBox[unitKey]))
+        self.__writeParatranzJSON(result, args[1])
+
+    def outModInfo(self, *args):
+        self.__commonTranslateFunc_v1(*args)
 
     @staticmethod
     def __filterJSON5(fileContent: str):

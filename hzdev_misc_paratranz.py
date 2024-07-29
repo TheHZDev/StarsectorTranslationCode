@@ -1,7 +1,7 @@
 import pprint
 from os import sep, scandir, DirEntry
 from os.path import isfile, isdir
-from typing import List, Dict
+from typing import List, Dict, Tuple, NamedTuple
 import re
 import csv
 from hashlib import md5
@@ -287,6 +287,22 @@ class ParatrazProject:
         makedirs(toMakeDIR)
 
 
+class QuotedSpecialData(NamedTuple):
+    """代换信息缓存数据。"""
+    specialData: List[Tuple[str, str]]
+
+    def endTask(self, endContent: str) -> str:
+        """
+        在所有翻译完全替换后，将之前 **预处理的非紧要文本** 代换回原有形式。
+
+        :param endContent: 已处理好的，等待写回文件的翻译数据。
+        :return: 已经过代换处理的文本。
+        """
+        for unit in self.specialData:
+            endContent = endContent.replace(unit[0], unit[1], 1)
+        return endContent
+
+
 class SubParatranz(ParatrazProject):
 
     def ImportOneConfig(self, **kwargs):
@@ -452,13 +468,16 @@ class SubParatranz(ParatrazProject):
     # data/world/factions/*.faction
     def inFactions(self, *args):
         with open(args[0], encoding='UTF-8') as tFile:
-            tFileContent: dict = json5.loads(self.__filterJSON5(tFile.read()))
+            tFileContent: dict = json5.loads(self.__quoteSpecialDataForIn(re.compile('^"?tags"?'), self.__filterJSON5(tFile.read())))
         # 预定义关键字解析
         result = []
         for strKey in ('displayName', 'displayNameWithArticle', 'displayNameLong', 'displayNameLongWithArticle',
                        'displayNameIsOrAre'):
             if strKey in tFileContent:
                 result.append(self.__buildDict(f'root#{strKey}', tFileContent.get(strKey)))
+                if strKey == 'displayNameIsOrAre':  # 240729：往刚刚增加的翻译文本里覆写默认数据
+                    result[-1]['translation'] = '是'
+                    result[-1]['stage'] = 1
         # 名字好了
         if 'ranks' in tFileContent:
             ranksDict: Dict[str, Dict[str, Dict[str, str]]] = tFileContent.get('ranks')
@@ -476,7 +495,8 @@ class SubParatranz(ParatrazProject):
 
     def outFactions(self, *args):
         with open(args[0], encoding='UTF-8') as tFile:
-            tOriginal: dict = json5.loads(self.__filterJSON5(tFile.read()))
+            preContent, toReplaceData = self.__quoteSpecialDataForOut(re.compile('^"?tags"?'), self.__filterJSON5(tFile.read()))
+            tOriginal: dict = json5.loads(preContent)
         # 读取原文文件内容
         tTranslation = self.__readParatranzJSON(args[1])
         # 读取译文文件内容
@@ -509,7 +529,7 @@ class SubParatranz(ParatrazProject):
                         break
                     countID += 1
         with open(args[2], 'w', encoding='UTF-8') as tFile:
-            json5.dump(tOriginal, tFile, ensure_ascii=False, indent=4, quote_keys=True)
+            tFile.write(toReplaceData.endTask(json.dumps(tOriginal, ensure_ascii=False, indent=4)))
 
     # data/strings/tips.json
     def inTips(self, *args):
@@ -776,7 +796,7 @@ class SubParatranz(ParatrazProject):
     # data/hulls/skins/*.skin
     def inHullSkinFile(self, *args):
         with open(args[0], encoding='UTF-8') as tFile:
-            tOriginal: dict = json5.loads(self.__filterJSON5(tFile.read()))
+            tOriginal: dict = json5.loads(self.__quoteSpecialDataForIn(re.compile('^"?(hints|removeHints|addHints)"?:'), self.__filterJSON5(tFile.read())))
         result = []
         for keyStr in ('hullName', 'descriptionPrefix', 'tech'):
             if keyStr in tOriginal:
@@ -784,7 +804,16 @@ class SubParatranz(ParatrazProject):
         self.__writeParatranzJSON(result, args[1])
 
     def outHullSkinFile(self, *args):
-        self.__commonTranslateFunc_v1(*args)
+        with open(args[0], encoding='UTF-8') as tFile:
+            preContent, toReplaceData = self.__quoteSpecialDataForOut(re.compile('^"?(hints|removeHints|addHints)"?:'), self.__filterJSON5(tFile.read()))
+            tOriginal = json5.loads(preContent)
+        for unit in self.__readParatranzJSON(args[1]):
+            if self.__hasTranslated(unit):
+                keyStr = unit.get('key').split('#')[1]
+                if keyStr in tOriginal:
+                    tOriginal[keyStr] = self.__getTranslation(unit)
+        with open(args[2], 'w', encoding='UTF-8') as tFile:
+            tFile.write(toReplaceData.endTask(json.dumps(tOriginal, ensure_ascii=False, indent=4)))
 
     # data/strings/combat_death_causes.csv 和 data/strings/hamster_death_causes.csv
     # 处理宠物系统的死因描述
@@ -815,64 +844,33 @@ class SubParatranz(ParatrazProject):
     # data/config/custom_entities.json
     def inCustomEntity(self, *args):
         with open(args[0], encoding='UTF-8') as tFile:
-            preContent = self.__filterJSON5(tFile.read()).splitlines()
-            for lineID in range(len(preContent)):
-                lineStr = preContent[lineID].strip()
-                if lineStr.startswith('//') or lineStr.startswith('#'):
-                    continue
-                if lineStr.startswith('"layers"'):
-                    tVar = lineStr if '//' not in lineStr else lineStr.partition('//')[0]
-                    # 预处理
-                    tVar3 = tVar.replace('"layers"', '').replace(':', '').strip()
-                    if tVar3.endswith(','):
-                        tVar3 = tVar3[:-1]
-                    tVar3 = tVar3.strip()
-                    tVar2 = []
-                    if ',' in tVar3:
-                        for unit in tVar3.replace('[', '').replace(']', '').split(','):
-                            tVar2.append(unit.strip())
-                    else:
-                        tVar2.append(tVar3[1:-1])
-                    preContent[lineID] = lineStr.replace(tVar3, json.dumps(tVar2, ensure_ascii=False))
-            tOriginal: dict = json5.loads('\n'.join(preContent))
+            tOriginal: dict = json5.loads(self.__quoteSpecialDataForIn(re.compile('^"layers":'), self.__filterJSON5(tFile.read())))
         result = []
         for firstKey in tOriginal:
             secondDict: dict = tOriginal[firstKey]
             for unit in ('defaultName', 'nameInText', 'shortName', 'aOrAn', 'isOrAre'):
                 if unit in secondDict and len(secondDict[unit]) > 0:
                     result.append(self.__buildDict(f'{firstKey}#{unit}', secondDict[unit], f'[本行原始数据]\n{pprint.pformat(secondDict, sort_dicts=False)}'))
+                    if unit == 'aOrAn':
+                        result[-1]['stage'] = 1
+                        result[-1]['translation'] = '一个'
+                    elif unit == 'isOrAre':
+                        result[-1]['stage'] = 1
+                        result[-1]['translation'] = '是'
         self.__writeParatranzJSON(result, args[1])
 
     def outCustomEntity(self, *args):
-        import hashlib, base64
-        const_hash = hashlib.md5(args[0].encode('utf-8')).hexdigest()
         with open(args[0], encoding='UTF-8') as tFile:
-            preContent = self.__filterJSON5(tFile.read()).splitlines()
-            for lineID in range(len(preContent)):
-                lineStr = preContent[lineID].strip()
-                if lineStr.startswith('//') or lineStr.startswith('#'):
-                    continue
-                if lineStr.startswith('"layers"'): # 输出翻译时不需要考虑这行的内容，只需要之后输出后再替换回来就行
-                    tVar = base64.b64encode((lineStr if '//' not in lineStr else lineStr.partition('//')[0]).strip().encode('UTF-8')).decode()
-                    preContent[lineID] = f'"{const_hash}": "{tVar}",'
-            tOriginal: dict = json5.loads('\n'.join(preContent))
+            preContent, toReplaceData = self.__quoteSpecialDataForOut(re.compile('^"layers"'), self.__filterJSON5(tFile.read()))
+            tOriginal: dict = json5.loads(preContent)
         for unit in self.__readParatranzJSON(args[1]):
             if self.__hasTranslated(unit):
                 firstKey, secondKey = unit.get('key').split('#')
                 if firstKey in tOriginal:
                     tOriginal[firstKey][secondKey] = self.__getTranslation(unit)
-        preResult: str = json5.dumps(tOriginal, ensure_ascii=False, indent=4, quote_keys=True)
-        preResult_Group = preResult.splitlines()
-        for lineID in range(len(preResult_Group)):
-            lineStr = preResult_Group[lineID]
-            if lineStr.strip().startswith(f'"{const_hash}"'):
-                # 剥离出来后就可以替换掉了
-                originalContent = '        ' + base64.b64decode(lineStr.replace(const_hash, '').replace('"', '').replace(':', '').strip().encode()).decode('UTF-8')
-                if not originalContent.endswith(','):
-                    originalContent += ','
-                preResult_Group[lineID] = originalContent
+        preResult = toReplaceData.endTask(json5.dumps(tOriginal, ensure_ascii=False, indent=4, quote_keys=True))
         with open(args[2], 'w', encoding='UTF-8') as tFile:
-            tFile.write('\n'.join(preResult_Group))
+            tFile.write(preResult)
 
     # data/config/LunaSettings.csv
     # 本来这个文件应该交给汉化组写的脚本处理，但是由于某些原因……
@@ -1042,6 +1040,85 @@ class SubParatranz(ParatrazProject):
                 else:
                     tVar.add(unit[keyStr])
         return result
+
+    @staticmethod
+    def __quoteSpecialDataForIn(filterFunction: re.Pattern, preContent: str) -> str:
+        """
+        将配置文件中不用 **双引号** 括起来的非紧要关键字转成可以被正确处理的字符串。
+
+        **仅可用于入方向，也就是将原始文件转为Paratranz数据文件的时候。**
+
+        :param filterFunction: 过滤函数，用于在 **preContent** 中逐行查找匹配数据。
+        :param preContent: 要处理的文本。
+        :return: 已重新编码的数据。
+        """
+        preContentList = preContent.splitlines()
+        const_searchEngine = re.compile('[A-Za-z_]+')
+        const_referenceEngine = re.compile('"[A-Za-z_]+"')
+        for lineID in range(len(preContentList)):
+            if filterFunction.search(preContentList[lineID]) is not None:
+                line = preContentList[lineID]
+                headStr, _ , line = line.partition(':')
+                if '//' in line:
+                    line, _, hintText = line.partition('//')
+                else:
+                    hintText = None
+                line = line.strip()
+                # 通过比较带引号的方式来处理文本
+                t1 = const_searchEngine.findall(line)
+                t2 = const_referenceEngine.findall(line)
+                for t3 in t2:
+                    if t3[1:-1] in t1:
+                        t1.remove(t3[1:-1])
+                # 预先移除不需要处理的词
+                for needReplaceWord in t1:
+                    str1, _, str2 = line.partition(needReplaceWord)
+                    line = f'{str1}"{needReplaceWord}"{str2}'
+                preContentList[lineID] = headStr + ':' + line + (f'//{hintText}' if hintText is not None else '')
+        return '\n'.join(preContentList)
+
+    @staticmethod
+    def __quoteSpecialDataForOut(filterFunction: re.Pattern, preContent: str) -> Tuple[str, QuotedSpecialData]:
+        """
+        将配置文件中不用 **双引号** 括起来的非紧要关键字转成可以被正确处理的字符串。
+
+        **仅可用于出方向，也就是将Paratranz数据文件转为已翻译文件的时候。**
+
+        :param filterFunction: 过滤函数，用于在 **preContent** 中逐行查找匹配数据。
+        :param preContent: 要处理的文本。
+        :return: 已处理好的字符串 | 在之后提取时使用到的字符串集合。
+        """
+        preContentList = preContent.splitlines()
+        const_searchEngine = re.compile('[A-Za-z_]+')
+        const_referenceEngine = re.compile('"[A-Za-z_]+"')
+        hashID = 1
+        result = []
+        for lineID in range(len(preContentList)):
+            if filterFunction.search(preContentList[lineID]) is not None:
+                line = preContentList[lineID]
+                headStr, _, line = line.partition(':')
+                if '//' in line:  # 直接删除注释
+                    line = line.partition('//')[0]
+                line = line.strip()
+                # 通过比较带引号的方式来处理文本
+                t1: List[str] = const_searchEngine.findall(line)
+                t2 = const_referenceEngine.findall(line)
+                for t3 in t2:
+                    if t3[1:-1] in t1:
+                        t1.remove(t3[1:-1])
+                # 预先移除不需要处理的词
+                if len(t1) > 0:
+                    for needReplaceWord in t1:
+                        str1, _, str2 = line.partition(needReplaceWord)
+                        hashStr = md5(f'{hashID}'.encode()).hexdigest()
+                        while hashStr in preContent:  # 使用非重复Hash进行标记
+                            hashID += 1
+                            hashStr = md5(f'{hashID}'.encode()).hexdigest()
+                        line = f'{str1}"{hashStr}"{str2}'
+                        result.append((f'"{hashStr}"', needReplaceWord))
+                        hashID += 1
+                    preContentList[lineID] = headStr + ':' + line
+        return '\n'.join(preContentList), QuotedSpecialData(result)
 
 
 if __name__ == '__main__':

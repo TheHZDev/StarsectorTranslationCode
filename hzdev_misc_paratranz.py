@@ -1125,8 +1125,8 @@ class SubParatranz(ParatrazProject):
         :return: 已重新编码的数据。
         """
         preContentList = preContent.splitlines()
-        const_searchEngine = re.compile('[A-Za-z_]+')
-        const_referenceEngine = re.compile('"[A-Za-z_]+"')
+        const_searchEngine = re.compile('[A-Za-z0-9_]+')
+        const_referenceEngine = re.compile('"[A-Za-z0-9_]+"')
         for lineID in range(len(preContentList)):
             if filterFunction.search(preContentList[lineID]) is not None:
                 line = preContentList[lineID]
@@ -1143,9 +1143,14 @@ class SubParatranz(ParatrazProject):
                     if t3[1:-1] in t1:
                         t1.remove(t3[1:-1])
                 # 预先移除不需要处理的词
+                t4 = {}
                 for needReplaceWord in t1:
                     str1, _, str2 = line.partition(needReplaceWord)
-                    line = f'{str1}"{needReplaceWord}"{str2}'
+                    tMD5 = md5(str(len(t4)).encode()).hexdigest()
+                    line = f'{str1}"{tMD5}"{str2}'
+                    t4[tMD5] = needReplaceWord
+                for unit in t4:
+                    line = line.replace(unit, t4.get(unit))
                 preContentList[lineID] = headStr + ':' + line + (f'//{hintText}' if hintText is not None else '')
         return '\n'.join(preContentList)
 
@@ -1161,8 +1166,8 @@ class SubParatranz(ParatrazProject):
         :return: 已处理好的字符串 | 在之后提取时使用到的字符串集合。
         """
         preContentList = preContent.splitlines()
-        const_searchEngine = re.compile('[A-Za-z_]+')
-        const_referenceEngine = re.compile('"[A-Za-z_]+"')
+        const_searchEngine = re.compile('[A-Za-z0-9_]+')
+        const_referenceEngine = re.compile('"[A-Za-z0-9_]+"')
         hashID = 1
         result = []
         for lineID in range(len(preContentList)):

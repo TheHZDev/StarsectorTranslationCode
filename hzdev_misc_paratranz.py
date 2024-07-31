@@ -302,6 +302,35 @@ class QuotedSpecialData(NamedTuple):
             endContent = endContent.replace(unit[0], unit[1], 1)
         return endContent
 
+class ParatranzDataUnit:
+    key: str  # 词条的唯一ID
+    original: str  # 词条的原文（待翻译文本）
+    translation: str  # 词条的翻译
+    stage: int  # 词条当前的状态，默认是0，即待翻译
+    context: str  # 词条的上下文，比如词条的应用场景
+
+    def __init__(self, key: str, original: str, context: str = None, **kwargs):
+        """
+        描述一个Paratranz的词条属性数据。
+
+        :param key: 词条在Paratranz上显示的“键值”。
+        :param original: 词条的原文，待翻译文本。
+        :param context: 词条的上下文数据。
+        """
+        self.key = key
+        self.original = original
+        self.translation = kwargs.get('translation', '')
+        self.stage = kwargs.get('stage', 0)
+        self.context = context
+
+    def asDict(self):
+        return dict(key=self.key, original=self.original, translation=self.translation, stage=self.stage, context=self.context)
+
+    @property
+    def isTranslated(self):
+        """该词条是否被标记为已翻译、已检查（一校）或已审核？"""
+        return self.stage in (1,3,5)
+
 
 class SubParatranz(ParatrazProject):
 
@@ -402,6 +431,12 @@ class SubParatranz(ParatrazProject):
         # 原版 - Mod简介
         self.ImportOneConfig(Register=path, Path=['/mod_info.json'],
                              FromOriginal=self.inModInfo, ToLocalization=self.outModInfo)
+        # 原版 - 行星类型的数据
+        self.ImportOneConfig(Register=path, Path=['/data/config/planets.json'],
+                             FromOriginal=self.inPlanets, ToLocalization=self.outPlanets)
+        # 原版 - settings.json中的数据
+        self.ImportOneConfig(Register=path, Path=['/data/config/settings.json'],
+                             FromOriginal=self.inSettings, ToLocalization=self.outSettings)
 
     # data/missions/*
     def inMissions(self, *args):
@@ -419,12 +454,12 @@ class SubParatranz(ParatrazProject):
         with open(args[0], encoding='UTF-8') as tFile:
             tContent: dict = json5.loads(self.__filterJSON5(tFile.read()))
         for unit in self.__readParatranzJSON(args[2]):
-            if self.__hasTranslated(unit):
-                if unit.get('key') == 'mission#text':
+            if unit.isTranslated:
+                if unit.key == 'mission#text':
                     with open(args[4], 'w', encoding='UTF-8') as tFile:
                         tFile.write(self.__getTranslation(unit))
                 else:
-                    realID = unit.get('key').split('#')[1]
+                    realID = unit.key.split('#')[1]
                     if realID in tContent:
                         tContent[realID] = self.__getTranslation(unit)
         with open(args[3], 'w', encoding='UTF-8') as tFile:
@@ -447,7 +482,7 @@ class SubParatranz(ParatrazProject):
             for secondKey in originalJSON5.get(firstKey).keys():
                 lineConfig = self.__buildDict(f'{firstKey}#{secondKey}', originalJSON5[firstKey][secondKey])
                 if secondKey in commentCode:
-                    lineConfig['context'] = commentCode.pop(secondKey).strip()
+                    lineConfig.context = commentCode.pop(secondKey).strip()
                 result.append(lineConfig)
         # 写入文件
         self.__writeParatranzJSON(result, args[1])
@@ -457,13 +492,13 @@ class SubParatranz(ParatrazProject):
         # 读取内容
         result = {}
         for unit in tTranslation:
-            keyID = unit.get('key', '').split('#')
+            keyID = unit.key.split('#')
             if keyID[0] not in result:
                 result[keyID[0]] = {}
-            if self.__hasTranslated(unit) and len(self.__getTranslation(unit)) > 0:
+            if unit.isTranslated and len(self.__getTranslation(unit)) > 0:
                 result.get(keyID[0])[keyID[1]] = self.__getTranslation(unit)
             else:
-                result.get(keyID[0])[keyID[1]] = unit.get('original')  # 不至于出现什么missing_string
+                result.get(keyID[0])[keyID[1]] = unit.original  # 不至于出现什么missing_string
         # 处理完成
         with open(args[2], 'w', encoding='UTF-8') as tFile:
             json5.dump(result, tFile, ensure_ascii=False, indent=4, quote_keys=True)
@@ -479,8 +514,8 @@ class SubParatranz(ParatrazProject):
             if strKey in tFileContent:
                 result.append(self.__buildDict(f'root#{strKey}', tFileContent.get(strKey)))
                 if strKey == 'displayNameIsOrAre':  # 240729：往刚刚增加的翻译文本里覆写默认数据
-                    result[-1]['translation'] = '是'
-                    result[-1]['stage'] = 1
+                    result[-1].translation = '是'
+                    result[-1].stage = 1
         # 名字好了
         if 'ranks' in tFileContent:
             ranksDict: Dict[str, Dict[str, Dict[str, str]]] = tFileContent.get('ranks')
@@ -504,12 +539,12 @@ class SubParatranz(ParatrazProject):
         tTranslation = self.__readParatranzJSON(args[1])
         # 读取译文文件内容
         for unit in tTranslation:
-            if not self.__hasTranslated(unit):
+            if not unit.isTranslated:
                 continue
-            keyID: str = unit.get('key')
+            keyID: str = unit.key
             translation: str = self.__getTranslation(unit)
             if len(translation) == 0:
-                translation = unit.get('original')  # 确保始终有数据，不至于直接游戏中报错
+                translation = unit.original  # 确保始终有数据，不至于直接游戏中报错
             if keyID.startswith('root#'):
                 realKey = keyID.split('root#')[1]
                 if realKey in tOriginal:
@@ -553,12 +588,12 @@ class SubParatranz(ParatrazProject):
         tTranslation = self.__readParatranzJSON(args[1])
         result = {'tips': []}
         for unit in tTranslation:
-            if self.__hasTranslated(unit):
-                if '$' not in unit.get('key'):
+            if unit.isTranslated:
+                if '$' not in unit.key:
                     result['tips'].append(self.__getTranslation(unit))
                 else:
                     result['tips'].append(
-                        {'freq': float(unit.get('key').split('$')[1]), 'tip': self.__getTranslation(unit)})
+                        {'freq': float(unit.key.split('$')[1]), 'tip': self.__getTranslation(unit)})
         tFile = open(args[2], 'w', encoding='UTF-8')
         json5.dump(result, tFile, ensure_ascii=False, indent=4, quote_keys=True)
         tFile.close()
@@ -584,8 +619,8 @@ class SubParatranz(ParatrazProject):
         tTranslation = self.__readParatranzJSON(args[1])
         result = {}
         for unit in tTranslation:
-            if self.__hasTranslated(unit):
-                firstKey = unit.get('key').split('$')[1].rpartition('@')[0]
+            if unit.isTranslated:
+                firstKey = unit.key.split('$')[1].rpartition('@')[0]
                 if firstKey not in result:
                     result[firstKey] = [{'text': self.__getTranslation(unit)}]
                 else:
@@ -613,8 +648,8 @@ class SubParatranz(ParatrazProject):
             for unit in tContent:
                 tOriginal[unit.get('id')] = unit
         for unit in self.__readParatranzJSON(args[1]):
-            if self.__hasTranslated(unit):
-                unitID, unitKey = unit.get('key').split('#')
+            if unit.isTranslated:
+                unitID, unitKey = unit.key.split('#')
                 if unitID in tOriginal:
                     tOriginal[unitID][unitKey] = self.__getTranslation(unit)
         with open(args[2], 'w', encoding='UTF-8') as tFile:
@@ -638,8 +673,8 @@ class SubParatranz(ParatrazProject):
     def outAllianceNames(self, *args):
         tResult = {}
         for unit in self.__readParatranzJSON(args[1]):
-            if self.__hasTranslated(unit):
-                firstKey, t1 = unit.get('key').split('#')
+            if unit.isTranslated:
+                firstKey, t1 = unit.key.split('#')
                 secondKey, thirdKey = t1.split('$')
                 if '%' in thirdKey:
                     thirdKey = thirdKey.split('%')[0]
@@ -663,9 +698,9 @@ class SubParatranz(ParatrazProject):
         for eventUnit in tOriginal:
             stageID = eventUnit.get('stage')
             result.append(
-                self.__buildDict(f'event#{stageID}$name', eventUnit.get('name'), "外交事件：\n" + str(eventUnit)))
+                self.__buildDict(f'event#{stageID}$name', eventUnit.get('name'), "外交事件：\n" + pprint.pformat(eventUnit, sort_dicts=False)))
             result.append(
-                self.__buildDict(f'event#{stageID}$desc', eventUnit.get('desc'), "外交事件：\n" + str(eventUnit)))
+                self.__buildDict(f'event#{stageID}$desc', eventUnit.get('desc'), "外交事件：\n" + pprint.pformat(eventUnit, sort_dicts=False)))
         self.__writeParatranzJSON(result, args[1])
 
     def outDiplomacyConfig(self, *args):
@@ -673,8 +708,8 @@ class SubParatranz(ParatrazProject):
             tOriginal: dict = json5.loads(self.__filterJSON5(tFile.read()))
         tEvent: List[dict] = tOriginal['events']
         for unit in self.__readParatranzJSON(args[1]):
-            if self.__hasTranslated(unit):
-                stageID, unitKey = unit.get('key').split('#')[1].split('$')
+            if unit.isTranslated:
+                stageID, unitKey = unit.key.split('#')[1].split('$')
                 for stageUnit in tEvent:
                     if stageUnit.get('stage') == stageID:
                         stageUnit[unitKey] = self.__getTranslation(unit)
@@ -699,8 +734,8 @@ class SubParatranz(ParatrazProject):
         with open(args[0], encoding='UTF-8') as tFile:
             tOriginal: Dict[str, Dict[str, Dict[str, str]]] = json5.loads(self.__filterJSON5(tFile.read()))
         for unit in self.__readParatranzJSON(args[1]):
-            if self.__hasTranslated(unit):
-                firstKey, tVar = unit.get('key').split('#')
+            if unit.isTranslated:
+                firstKey, tVar = unit.key.split('#')
                 secondKey, thirdKey = tVar.split('$')
                 if firstKey in tOriginal.keys() and secondKey in tOriginal[firstKey].keys() and thirdKey in \
                         tOriginal[firstKey][secondKey]:
@@ -746,11 +781,11 @@ class SubParatranz(ParatrazProject):
         with open(args[0], encoding='UTF-8') as tFile:
             tOriginal: dict = json5.loads(self.__filterJSON5(tFile.read()))
         for unit in self.__readParatranzJSON(args[1]):
-            if self.__hasTranslated(unit):
-                if unit.get('key') in tOriginal:
-                    tOriginal[unit.get('key')] = self.__getTranslation(unit)
-                elif '$' in unit.get('key'):  # 单层数组替换操作
-                    first, second = unit.get('key').split('$')
+            if unit.isTranslated:
+                if unit.key in tOriginal:
+                    tOriginal[unit.key] = self.__getTranslation(unit)
+                elif '$' in unit.key:  # 单层数组替换操作
+                    first, second = unit.key.split('$')
                     if first in tOriginal:
                         tOriginal[first][int(second)] = self.__getTranslation(unit)
         with open(args[2], 'w', encoding='UTF-8') as tFile:
@@ -811,8 +846,8 @@ class SubParatranz(ParatrazProject):
             preContent, toReplaceData = self.__quoteSpecialDataForOut(re.compile('^"?(hints|removeHints|addHints)"?:'), self.__filterJSON5(tFile.read()))
             tOriginal = json5.loads(preContent)
         for unit in self.__readParatranzJSON(args[1]):
-            if self.__hasTranslated(unit):
-                keyStr = unit.get('key').split('#')[1]
+            if unit.isTranslated:
+                keyStr = unit.key.split('#')[1]
                 if keyStr in tOriginal:
                     tOriginal[keyStr] = self.__getTranslation(unit)
         with open(args[2], 'w', encoding='UTF-8') as tFile:
@@ -837,7 +872,7 @@ class SubParatranz(ParatrazProject):
     def outDeathCauses(self, *args):
         result = []
         for unit in self.__readParatranzJSON(args[1]):
-            if self.__hasTranslated(unit):
+            if unit.isTranslated:
                 result.append({'id': self.__getTranslation(unit)})
         with open(args[2], 'w', newline='', encoding='UTF-8') as tFile:
             tVar = csv.DictWriter(tFile, list(result[0].keys()))
@@ -855,11 +890,11 @@ class SubParatranz(ParatrazProject):
                 if unit in secondDict and len(secondDict[unit]) > 0:
                     result.append(self.__buildDict(f'{firstKey}#{unit}', secondDict[unit], f'[本行原始数据]\n{pprint.pformat(secondDict, sort_dicts=False)}'))
                     if unit == 'aOrAn':
-                        result[-1]['stage'] = 1
-                        result[-1]['translation'] = '一个'
+                        result[-1].stage = 1
+                        result[-1].translation = '一个'
                     elif unit == 'isOrAre':
-                        result[-1]['stage'] = 1
-                        result[-1]['translation'] = '是'
+                        result[-1].stage = 1
+                        result[-1].translation = '是'
         self.__writeParatranzJSON(result, args[1])
 
     def outCustomEntity(self, *args):
@@ -867,8 +902,8 @@ class SubParatranz(ParatrazProject):
             preContent, toReplaceData = self.__quoteSpecialDataForOut(re.compile('^"layers"'), self.__filterJSON5(tFile.read()))
             tOriginal: dict = json5.loads(preContent)
         for unit in self.__readParatranzJSON(args[1]):
-            if self.__hasTranslated(unit):
-                firstKey, secondKey = unit.get('key').split('#')
+            if unit.isTranslated:
+                firstKey, secondKey = unit.key.split('#')
                 if firstKey in tOriginal:
                     tOriginal[firstKey][secondKey] = self.__getTranslation(unit)
         preResult = toReplaceData.endTask(json5.dumps(tOriginal, ensure_ascii=False, indent=4, quote_keys=True))
@@ -920,25 +955,25 @@ class SubParatranz(ParatrazProject):
             result = list(csv.DictReader(tFile))
         tVar_data = self.__readParatranzJSON(args[1])
         for unit in tVar_data:  # 批量替换标签数据
-            if 'tabValue$' in unit.get('key') and self.__hasTranslated(unit):
+            if 'tabValue$' in unit.key and unit.isTranslated:
                 for line in result:
-                    if 'tab' in line and line['tab'] == unit.get('original'):
+                    if 'tab' in line and line['tab'] == unit.original:
                         line['tab'] = self.__getTranslation(unit)
         for unit in tVar_data:
-            if 'tabValue$' in unit.get('key'):  # 不扫描特定数据
+            if 'tabValue$' in unit.key:  # 不扫描特定数据
                 continue
-            csvKeyID, csvValueKeyID = unit.get('key').split('#')
+            csvKeyID, csvValueKeyID = unit.key.split('#')
             if '$' in csvValueKeyID:
                 csvValueKeyID = csvValueKeyID.split('$')[0]  # 重复的键值会额外比较原文是否相符
                 for line in result:
-                    if line['fieldID'] == csvKeyID and line[csvValueKeyID] == unit.get('original'):
-                        if self.__hasTranslated(unit) and len(self.__getTranslation(unit)) > 0:
+                    if line['fieldID'] == csvKeyID and line[csvValueKeyID] == unit.original:
+                        if unit.isTranslated and len(self.__getTranslation(unit)) > 0:
                             line[csvValueKeyID] = self.__getTranslation(unit)
                             break
             else:
                 for line in result:
                     if line['fieldID'] == csvKeyID:
-                        if self.__hasTranslated(unit) and len(self.__getTranslation(unit)) > 0:
+                        if unit.isTranslated and len(self.__getTranslation(unit)) > 0:
                             line[csvValueKeyID] = self.__getTranslation(unit)
                             break
         with open(args[2], 'w', newline='', encoding='UTF-8') as tFile:
@@ -958,6 +993,41 @@ class SubParatranz(ParatrazProject):
 
     def outModInfo(self, *args):
         self.__commonTranslateFunc_v1(*args)
+
+    # data/config/planets.json
+    def inPlanets(self, *args):
+        with open(args[0], encoding='UTF-8') as tFile:
+            tOriginal: dict = json5.loads(self.__filterJSON5(tFile.read()))
+        result = []
+        for planetID in tOriginal:
+            if 'name' in tOriginal[planetID]:
+                result.append(self.__buildDict(f'{planetID}#name', tOriginal[planetID]['name'], f'行星类型（{planetID}）的名称'))
+        self.__writeParatranzJSON(result, args[1])
+
+    def outPlanets(self, *args):
+        self.__commonTranslateFunc_v2(*args)
+
+    # data/config/settings.json
+    # 240731: 仅处理 舰船设计分类 的颜色渲染效果，并尽可能使用较小影响的替换方式
+    def inSettings(self, *args):
+        with open(args[0], encoding='UTF-8') as tFile:
+            tOriginal: dict = json5.loads(self.__filterJSON5(tFile.read()))
+        result = []
+        if 'designTypeColors' in tOriginal:
+            for designType in tOriginal['designTypeColors']:  # 这串数据是字典，字符串映射到一串RGB值
+                tMD5 = md5(designType.encode()).hexdigest()
+                result.append(self.__buildDict(f'designTypeColors#{tMD5}', designType, '要渲染的舰船/武器/船插/LPC的设计类型名称，比如 “扩展纪元”/“核心纪元”/“主宰纪元”'))
+        self.__writeParatranzJSON(result, args[1])
+
+    def outSettings(self, *args):
+        with open(args[0], encoding='UTF-8') as tFile:
+            tOriginal = tFile.read()
+        for unit in self.__readParatranzJSON(args[1]):
+            if unit.isTranslated:
+                tOriginal = tOriginal.replace(f'"{unit.original}"', f'"{self.__getTranslation(unit)}"', 1)
+        with open(args[2], 'w', encoding='UTF-8') as tFile:
+            tFile.write(tOriginal)
+
 
     @staticmethod
     def __filterJSON5(fileContent: str):
@@ -988,45 +1058,31 @@ class SubParatranz(ParatrazProject):
 
     @staticmethod
     def __buildDict(keyID: str, original: str, context: str = None):
-        tVar = dict(key=keyID, original=original, translation="", stage=0)
-        if context is not None:
-            tVar['context'] = context
-        return tVar
+        return ParatranzDataUnit(keyID, original, context)
 
     @staticmethod
-    def __writeParatranzJSON(content: list, filePath: str):
+    def __writeParatranzJSON(content: List[ParatranzDataUnit], filePath: str):
         if len(content) == 0:
             return
-        tFile = open(filePath, 'w', encoding='UTF-8')
-        json.dump(content, tFile, ensure_ascii=False, indent=4)
-        tFile.close()
+        with open(filePath, 'w', encoding='UTF-8') as tFile:
+            json.dump([x.asDict() for x in content], tFile, ensure_ascii=False, indent=4)
 
     @staticmethod
-    def __readParatranzJSON(filePath: str) -> List[dict]:
-        tFile = open(filePath, encoding='UTF-8')
-        tData = json.load(tFile)
-        tFile.close()
-        return tData
+    def __readParatranzJSON(filePath: str) -> List[ParatranzDataUnit]:
+        with open(filePath, encoding='UTF-8') as tFile:
+            return [ParatranzDataUnit(**dataDict) for dataDict in json.load(tFile)]
 
     @staticmethod
-    def __hasTranslated(toDetect: dict):
-        if toDetect.get('stage') in (1, 3, 5):
-            # 1 = 已翻译，3 = 已审核（一校），5 = 二校
-            # 0 = 未翻译
-            return True
-        return False
-
-    @staticmethod
-    def __getTranslation(toGet: dict):
-        return toGet.get('translation').replace('\\n', '\n')
+    def __getTranslation(toGet: ParatranzDataUnit):
+        return toGet.translation.replace('\\n', '\n')
 
     def __commonTranslateFunc_v1(self, *args):
         """提供一些只有一层json的翻译函数。"""
         with open(args[0], encoding='UTF-8') as tFile:
-            tOriginal: Dict[str, dict] = json5.loads(self.__filterJSON5(tFile.read()))
+            tOriginal: dict = json5.loads(self.__filterJSON5(tFile.read()))
         for unit in self.__readParatranzJSON(args[1]):
-            if self.__hasTranslated(unit):
-                keyStr = unit.get('key').split('#')[1]
+            if unit.isTranslated:
+                keyStr = unit.key.split('#')[1]
                 if keyStr in tOriginal:
                     tOriginal[keyStr] = self.__getTranslation(unit)
         with open(args[2], 'w', encoding='UTF-8') as tFile:
@@ -1037,8 +1093,8 @@ class SubParatranz(ParatrazProject):
         with open(args[0], encoding='UTF-8') as tFile:
             tOriginal: Dict[str, dict] = json5.loads(self.__filterJSON5(tFile.read()))
         for unit in self.__readParatranzJSON(args[1]):
-            if self.__hasTranslated(unit):
-                firstKey, secondKey = unit.get('key').split('#')
+            if unit.isTranslated:
+                firstKey, secondKey = unit.key.split('#')
                 if firstKey in tOriginal and secondKey in tOriginal[firstKey]:
                     tOriginal[firstKey][secondKey] = self.__getTranslation(unit)
         with open(args[2], 'w', encoding='UTF-8') as tFile:

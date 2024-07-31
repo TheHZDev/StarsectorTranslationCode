@@ -1010,13 +1010,31 @@ class SubParatranz(ParatrazProject):
     # data/config/settings.json
     # 240731: 仅处理 舰船设计分类 的颜色渲染效果，并尽可能使用较小影响的替换方式
     def inSettings(self, *args):
+        from os.path import sep as os_sep, isfile, join as path_join
+        from csv import DictReader
+
         with open(args[0], encoding='UTF-8') as tFile:
             tOriginal: dict = json5.loads(self.__filterJSON5(tFile.read()))
         result = []
+        allDesignType = set()
         if 'designTypeColors' in tOriginal:
             for designType in tOriginal['designTypeColors']:  # 这串数据是字典，字符串映射到一串RGB值
-                tMD5 = md5(designType.encode()).hexdigest()
-                result.append(self.__buildDict(f'designTypeColors#{tMD5}', designType, '要渲染的舰船/武器/船插/LPC的设计类型名称，比如 “扩展纪元”/“核心纪元”/“主宰纪元”'))
+                allDesignType.add(designType)
+        # 调查所有涉及的文件
+        mainFolderPath = str(args[0]).rpartition(os_sep)[0].rpartition(os_sep)[0]
+        otherDesignType = set()
+        for filePath in [('hullmods', 'hull_mods.csv'), ('hulls', 'ship_data.csv'), ('weapons', 'weapon_data.csv')]:
+            realFilePath = path_join(mainFolderPath, *filePath)
+            if isfile(realFilePath):
+                with open(realFilePath, encoding='UTF-8') as tFile:
+                    for lineData in list(DictReader(tFile)):
+                        if 'tech/manufacturer' in lineData:
+                            tVar = lineData['tech/manufacturer']
+                            if len(tVar.strip()) > 0:
+                                otherDesignType.add(tVar.strip())
+        for targetUnit in (otherDesignType & allDesignType):
+            tMD5 = md5(targetUnit.encode()).hexdigest()
+            result.append(self.__buildDict(f'designTypeColors#{tMD5}', targetUnit, '要渲染的舰船/武器/船插/LPC的设计类型名称，比如 “扩展纪元”/“核心纪元”/“主宰纪元”'))
         self.__writeParatranzJSON(result, args[1])
 
     def outSettings(self, *args):

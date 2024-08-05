@@ -106,6 +106,10 @@ const_refData = {
         'id_column_name': 'id',
         'text_column_names': ['tooltip', 'tooltip_highlights']
     },
+    'data/config/magic_achievements.csv': {  # 推测是MagicLib的成就系统的相关数据
+        'id_column_name': 'id',
+        'text_column_names': ['name', 'description', 'tooltip']
+    },
     # '': {
     #     'id_column_name': '',
     #     'text_column_names': []

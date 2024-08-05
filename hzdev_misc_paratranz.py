@@ -431,9 +431,12 @@ class SubParatranz(ParatrazProject):
         # 原版 - Mod简介
         self.ImportOneConfig(Register=path, Path=['/mod_info.json'],
                              FromOriginal=self.inModInfo, ToLocalization=self.outModInfo)
-        # 原版 - 行星类型的数据
+        # 原版 - 行星类型（planets.json）的数据
         self.ImportOneConfig(Register=path, Path=['/data/config/planets.json'],
                              FromOriginal=self.inPlanets, ToLocalization=self.outPlanets)
+        # 原版 - 局部战斗中的可占领战术点（比如通讯中继站/传感干扰器）数据
+        self.ImportOneConfig(Register=path, Path=['data/config/battle_objectives.json'],
+                             FromOriginal=self.inBattleObjectives, ToLocalization=self.outBattleObjectives)
         # 原版 - settings.json中的数据
         self.ImportOneConfig(Register=path, Path=['/data/config/settings.json'],
                              FromOriginal=self.inSettings, ToLocalization=self.outSettings)
@@ -1023,7 +1026,7 @@ class SubParatranz(ParatrazProject):
         # 调查所有涉及的文件
         mainFolderPath = str(args[0]).rpartition(os_sep)[0].rpartition(os_sep)[0]
         otherDesignType = set()
-        for filePath in [('hullmods', 'hull_mods.csv'), ('hulls', 'ship_data.csv'), ('weapons', 'weapon_data.csv')]:
+        for filePath in [('hullmods', 'hull_mods.csv'), ('hulls', 'ship_data.csv'), ('weapons', 'weapon_data.csv'), ('campaign', 'special_items.csv')]:
             realFilePath = path_join(mainFolderPath, *filePath)
             if isfile(realFilePath):
                 with open(realFilePath, encoding='UTF-8') as tFile:
@@ -1046,6 +1049,19 @@ class SubParatranz(ParatrazProject):
         with open(args[2], 'w', encoding='UTF-8') as tFile:
             tFile.write(tOriginal)
 
+    # data/config/battle_objectives.json
+    def inBattleObjectives(self, *args):
+        with open(args[0], encoding='UTF-8') as tFile:
+            tOriginal: dict = json5.loads(self.__filterJSON5(tFile.read()))
+        result = []
+        for firstKey in tOriginal:
+            if 'name' in tOriginal[firstKey]:
+                result.append(self.__buildDict(f'{firstKey}#name', tOriginal[firstKey]['name'],
+                                               f'[本行原始数据]\n{pprint.pformat(tOriginal[firstKey], sort_dicts=False)}'))
+        self.__writeParatranzJSON(result, args[1])
+
+    def outBattleObjectives(self, *args):
+        self.__commonTranslateFunc_v2(*args)
 
     @staticmethod
     def __filterJSON5(fileContent: str):

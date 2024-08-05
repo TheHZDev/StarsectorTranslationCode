@@ -435,7 +435,7 @@ class SubParatranz(ParatrazProject):
         self.ImportOneConfig(Register=path, Path=['/data/config/planets.json'],
                              FromOriginal=self.inPlanets, ToLocalization=self.outPlanets)
         # 原版 - 局部战斗中的可占领战术点（比如通讯中继站/传感干扰器）数据
-        self.ImportOneConfig(Register=path, Path=['data/config/battle_objectives.json'],
+        self.ImportOneConfig(Register=path, Path=['/data/config/battle_objectives.json'],
                              FromOriginal=self.inBattleObjectives, ToLocalization=self.outBattleObjectives)
         # 原版 - settings.json中的数据
         self.ImportOneConfig(Register=path, Path=['/data/config/settings.json'],

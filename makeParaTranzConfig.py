@@ -100,15 +100,24 @@ const_refData = {
     },
     'data/campaign/terraforming/terraforming_projects.csv': {  # 首次出现于TASC mod，项目名称和提示
         'id_column_name': 'id',
-        'text_column_names': ['tooltip', 'tooltip_highlights', 'intel_complete_message', 'incomplete_message', 'incomplete_message_highlights', 'disrupted_message', 'disrupted_message_highlights']
+        'text_column_names': ['tooltip', 'tooltip_highlights', 'intel_complete_message', 'incomplete_message',
+                              'incomplete_message_highlights', 'disrupted_message', 'disrupted_message_highlights']
     },
     'data/campaign/terraforming/terraforming_requirements_OR.csv': {  # 首次出现于TASC mod
         'id_column_name': 'id',
         'text_column_names': ['tooltip', 'tooltip_highlights']
     },
-    'data/config/magic_achievements.csv': {  # 推测是MagicLib的成就系统的相关数据
+    'data/config/secondInCommand/SCAptitudes.csv': {  # 首次出现于 Second-In-Command mod 中，推测是主领域分类
         'id_column_name': 'id',
-        'text_column_names': ['name', 'description', 'tooltip']
+        'text_column_names': ['name']
+    },
+    'data/config/secondInCommand/SCCategories.csv': {  # 首次出现于 Second-In-Command mod 中，推测是子领域（Aptitude的下级）
+        'id_column_name': 'id',
+        'text_column_names': ['name']
+    },
+    'data/config/secondInCommand/SCSkills.csv': {  # 首次出现于 Second-In-Command mod 中，推测是技能数据
+        'id_column_name': 'id',
+        'text_column_names': ['name']
     },
     # '': {
     #     'id_column_name': '',

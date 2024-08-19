@@ -4,6 +4,7 @@ from os.path import isfile, isdir
 from typing import List, Dict, Tuple, NamedTuple
 import re
 import csv
+from enum import Enum
 from hashlib import md5
 
 import json
@@ -14,6 +15,21 @@ from para_tranz_script import PARA_TRANZ_PATH, ORIGINAL_PATH, TRANSLATION_PATH
 PARA_TRANZ_PATH = str(PARA_TRANZ_PATH)
 ORIGINAL_PATH = str(ORIGINAL_PATH)
 TRANSLATION_PATH = str(TRANSLATION_PATH)
+
+
+class RegisterEnum(Enum):
+    """
+    此类用于实现注册分类器时的分类标签参考。本身无实际意义，仅作分类使用。
+
+    标签后的字符串是注释，一般情况下请不要直接使用。
+    """
+    path: str = 'PathOnly'
+    folder: str = 'FolderOnly'
+    ext: str = 'ExtOnly'
+    folder_ext: str = 'FolderPlusExt'
+    # 特殊分类标签
+    mission: str = 'MissionOnly'
+    all: str = 'Everything'
 
 
 class ParatrazProject:
@@ -68,19 +84,20 @@ class ParatrazProject:
 
     def __filterConfig(self):
         for program in self.__config:
-            if isinstance(program, dict) and program.get('Register') == 'mission' and len(self.__missionProgram) == 0:
+            if isinstance(program, dict) and program.get('Register') == RegisterEnum.mission and len(
+                    self.__missionProgram) == 0:
                 self.__missionProgram = program
             elif isinstance(program, dict) and 'FromOriginal' in program and 'ToLocalization' in program:
                 tVar = program.get('Register')
-                if tVar == 'path' and isinstance(program.get('Path'), list):
+                if tVar == RegisterEnum.path and isinstance(program.get('Path'), list):
                     self.__pathProgram.append(program)
-                elif tVar == 'folder' and isinstance(program.get('Folder'), list):
+                elif tVar == RegisterEnum.folder and isinstance(program.get('Folder'), list):
                     self.__folderProgram.append(program)
-                elif tVar == 'ext' and isinstance(program.get('Ext'), list):
+                elif tVar == RegisterEnum.ext and isinstance(program.get('Ext'), list):
                     self.__extProgram.append(program)
-                elif tVar == 'folder_ext' and isinstance(program.get('Folder_Ext'), list):
+                elif tVar == RegisterEnum.folder_ext and isinstance(program.get('Folder_Ext'), list):
                     self.__folder_ext_Program.append(program)
-                elif tVar == 'all':
+                elif tVar == RegisterEnum.all:
                     self.__allProgram.append(program)
 
     def Start(self):
@@ -288,7 +305,7 @@ class ParatrazProject:
 
 
 class QuotedSpecialData(NamedTuple):
-    """代换信息缓存数据。"""
+    """JSON中非标准字符串（两端不带双引号）的替换信息缓存数据。"""
     specialData: List[Tuple[str, str]]
 
     def endTask(self, endContent: str) -> str:
@@ -301,6 +318,7 @@ class QuotedSpecialData(NamedTuple):
         for unit in self.specialData:
             endContent = endContent.replace(unit[0], unit[1], 1)
         return endContent
+
 
 class ParatranzDataUnit:
     key: str  # 词条的唯一ID
@@ -324,19 +342,20 @@ class ParatranzDataUnit:
         self.context = context
 
     def asDict(self):
-        return dict(key=self.key, original=self.original, translation=self.translation, stage=self.stage, context=self.context)
+        return dict(key=self.key, original=self.original, translation=self.translation, stage=self.stage,
+                    context=self.context)
 
     @property
     def isTranslated(self):
         """该词条是否被标记为已翻译、已检查（一校）或已审核？"""
-        return self.stage in (1,3,5)
+        return self.stage in (1, 3, 5)
 
 
 class SubParatranz(ParatrazProject):
 
     def ImportOneConfig(self, **kwargs):
-        if kwargs.get('Register') == 'mission':
-            self.Config.append({'Register': 'mission', 'FromMission': kwargs.get('FromMission').__name__,
+        if kwargs.get('Register') == RegisterEnum.mission:
+            self.Config.append({'Register': RegisterEnum.mission, 'FromMission': kwargs.get('FromMission').__name__,
                                 'ToMission': kwargs.get('ToMission').__name__})
         else:
             fromOriginal = kwargs.get('FromOriginal')
@@ -345,12 +364,13 @@ class SubParatranz(ParatrazProject):
                 fromOriginal = fromOriginal.__name__
             if callable(toLocalization):
                 toLocalization = toLocalization.__name__
-            if 'Register' not in kwargs or kwargs.get('Register') not in ('path', 'ext', 'folder', 'folder_ext', 'all'):
-                return False
-            if (kwargs.get('Register') == 'path' and not isinstance(kwargs.get('Path'), list)) or \
-                    (kwargs.get('Register') == 'folder' and not isinstance(kwargs.get('Folder'), list)) or \
-                    (kwargs.get('Register') == 'ext' and not isinstance(kwargs.get('Ext'), list)) or \
-                    (kwargs.get('Register') == 'folder_ext' and not isinstance(kwargs.get('Folder_Ext'), list)):
+            # if 'Register' not in kwargs or kwargs.get('Register') not in RegisterEnum:
+            #     return False
+            if (kwargs.get('Register') == RegisterEnum.path and not isinstance(kwargs.get('Path'), list)) or \
+                    (kwargs.get('Register') == RegisterEnum.folder and not isinstance(kwargs.get('Folder'), list)) or \
+                    (kwargs.get('Register') == RegisterEnum.ext and not isinstance(kwargs.get('Ext'), list)) or \
+                    (kwargs.get('Register') == RegisterEnum.folder_ext and not isinstance(kwargs.get('Folder_Ext'),
+                                                                                          list)):
                 return False
             if not (isinstance(fromOriginal, str) and isinstance(toLocalization, str)):
                 return False
@@ -359,86 +379,85 @@ class SubParatranz(ParatrazProject):
             # 开始动真格的
             thisConfig = {'Register': kwargs.get('Register'), 'FromOriginal': fromOriginal,
                           'ToLocalization': toLocalization}
-            if kwargs.get('Register') == 'path':
+            if kwargs.get('Register') == RegisterEnum.path:
                 thisConfig['Path'] = kwargs.get('Path')
-            elif kwargs.get('Register') == 'folder':
+            elif kwargs.get('Register') == RegisterEnum.folder:
                 thisConfig['Folder'] = kwargs.get('Folder')
-            elif kwargs.get('Register') == 'ext':
+            elif kwargs.get('Register') == RegisterEnum.ext:
                 thisConfig['Ext'] = kwargs.get('Ext')
-            elif kwargs.get('Register') == 'folder_ext':
+            elif kwargs.get('Register') == RegisterEnum.folder_ext:
                 thisConfig['Folder_Ext'] = kwargs.get('Folder_Ext')
             self.Config.append(thisConfig)
 
     def ImportConfig(self):
-        path = 'path'
-        folder = 'folder'
-        folder_ext = 'folder_ext'
-        ext = 'ext'
-        mission = 'mission'
         # 原版 - 战役外置文件的统一处理模块
-        self.ImportOneConfig(Register=mission, FromMission=self.inMissions, ToMission=self.outMissions)
+        self.ImportOneConfig(Register=RegisterEnum.mission, FromMission=self.inMissions, ToMission=self.outMissions)
         # 原版 - 代码中的字符串外置文件
-        self.ImportOneConfig(Register=path, Path=['/data/strings/strings.json'],
+        self.ImportOneConfig(Register=RegisterEnum.path, Path=['/data/strings/strings.json'],
                              FromOriginal=self.inStringsJSON, ToLocalization=self.outStringsJSON)
         # 原版 - 势力相关配置文件
-        self.ImportOneConfig(Register=folder_ext, Folder_Ext=[('/data/world/factions/', 'faction')],
+        self.ImportOneConfig(Register=RegisterEnum.folder_ext, Folder_Ext=[('/data/world/factions/', 'faction')],
                              FromOriginal=self.inFactions, ToLocalization=self.outFactions)
         # 原版 - 出现在S/L页面和主界面的游戏提示
-        self.ImportOneConfig(Register=path, Path=['/data/strings/tips.json'],
+        self.ImportOneConfig(Register=RegisterEnum.path, Path=['/data/strings/tips.json'],
                              FromOriginal=self.inTips, ToLocalization=self.outTips)
         # 战斗骚话mod - 相关战斗对话内容
-        self.ImportOneConfig(Register=folder_ext, Folder_Ext=[('/data/config/chatter/characters/', 'json')],
+        self.ImportOneConfig(Register=RegisterEnum.folder_ext,
+                             Folder_Ext=[('/data/config/chatter/characters/', 'json')],
                              FromOriginal=self.inChatter, ToLocalization=self.outChatter)
         # 势力争霸mod - 玩家可选的自定义开局
-        self.ImportOneConfig(Register=path, Path=['/data/config/exerelin/customStarts.json'],
+        self.ImportOneConfig(Register=RegisterEnum.path, Path=['/data/config/exerelin/customStarts.json'],
                              FromOriginal=self.inCustomStart, ToLocalization=self.outCustomStart)
         # 原版 - 默认阶层（Rank）相关配置
-        self.ImportOneConfig(Register=path, Path=['/data/world/factions/default_ranks.json'],
+        self.ImportOneConfig(Register=RegisterEnum.path, Path=['/data/world/factions/default_ranks.json'],
                              FromOriginal=self.inDefaultRanks, ToLocalization=self.outDefaultRanks)
         # MagicLib mod - 高价值赏金（HVB）的相关内容
-        self.ImportOneConfig(Register=path, Path=['/data/config/modFiles/magicBounty_data.json'],
+        self.ImportOneConfig(Register=RegisterEnum.path, Path=['/data/config/modFiles/magicBounty_data.json'],
                              FromOriginal=self.inMagicBountyData, ToLocalization=self.outMagicBountyData)
         # LunaLib mod - 一些用于在游戏中动态调整mod的数值的mod的相关配置
-        self.ImportOneConfig(Register=path, Path=['/data/config/LunaSettings.csv'],
+        self.ImportOneConfig(Register=RegisterEnum.path, Path=['/data/config/LunaSettings.csv'],
                              FromOriginal=self.inLunaSettings, ToLocalization=self.outLunaSettings)
         # 势力争霸mod - 势力建立同盟时的名称相关配置
-        self.ImportOneConfig(Register=path, Path=['/data/config/exerelin/allianceNames.json'],
+        self.ImportOneConfig(Register=RegisterEnum.path, Path=['/data/config/exerelin/allianceNames.json'],
                              FromOriginal=self.inAllianceNames, ToLocalization=self.outAllianceNames)
         # 势力争霸mod - 势力间进行外交的相关配置（但主要是处理事件名称和描述）
-        self.ImportOneConfig(Register=path, Path=['/data/config/exerelin/diplomacyConfig.json'],
+        self.ImportOneConfig(Register=RegisterEnum.path, Path=['/data/config/exerelin/diplomacyConfig.json'],
                              FromOriginal=self.inDiplomacyConfig, ToLocalization=self.outDiplomacyConfig)
         # 势力争霸mod - 一个势力在势力争霸环境下所使用的舰队名称和其他特殊信息
-        self.ImportOneConfig(Register=folder_ext, Folder_Ext=[('/data/config/exerelinFactionConfig/', 'json')],
+        self.ImportOneConfig(Register=RegisterEnum.folder_ext,
+                             Folder_Ext=[('/data/config/exerelinFactionConfig/', 'json')],
                              FromOriginal=self.inExerelinFactionConfig, ToLocalization=self.outExerelinFactionConfig)
         # 星舰传奇mod - 目前只处理一个显示
-        self.ImportOneConfig(Register=path, Path=['/data/config/starship_legends/factionConfigurations.json'],
+        self.ImportOneConfig(Register=RegisterEnum.path,
+                             Path=['/data/config/starship_legends/factionConfigurations.json'],
                              FromOriginal=self.inFactionConfigurations, ToLocalization=self.outFactionConfigurations)
         # 原版 - 联络人的相关分类属性
-        self.ImportOneConfig(Register=path, Path=['/data/config/contact_tag_data.json'],
+        self.ImportOneConfig(Register=RegisterEnum.path, Path=['/data/config/contact_tag_data.json'],
                              FromOriginal=self.inContactTagData, ToLocalization=self.outContactTagData)
         # 原版 - 舰船具体配置文件（231229：经向猫猫询问得知，该部分无需翻译）
         # self.ImportOneConfig(Register=folder_ext, Folder_Ext=[('/data/hulls/', 'ship')],
         #                      FromOriginal=self.inShipFile, ToLocalization=self.outShipFile)
         # 原版 - 舰船涂装配置
-        self.ImportOneConfig(Register=folder_ext, Folder_Ext=[('/data/hulls/skins/', 'skin')],
+        self.ImportOneConfig(Register=RegisterEnum.folder_ext, Folder_Ext=[('/data/hulls/skins/', 'skin')],
                              FromOriginal=self.inHullSkinFile, ToLocalization=self.outHullSkinFile)
         # 工业革命mod - 宠物死因列表
-        self.ImportOneConfig(Register=path, Path=['/data/strings/hamster_death_causes.csv', '/data/strings/combat_death_causes.csv'],
+        self.ImportOneConfig(Register=RegisterEnum.path,
+                             Path=['/data/strings/hamster_death_causes.csv', '/data/strings/combat_death_causes.csv'],
                              FromOriginal=self.inDeathCauses, ToLocalization=self.outDeathCauses)
         # 原版 - 自定义天体
-        self.ImportOneConfig(Register=path, Path=['/data/config/custom_entities.json'],
+        self.ImportOneConfig(Register=RegisterEnum.path, Path=['/data/config/custom_entities.json'],
                              FromOriginal=self.inCustomEntity, ToLocalization=self.outCustomEntity)
         # 原版 - Mod简介
-        self.ImportOneConfig(Register=path, Path=['/mod_info.json'],
+        self.ImportOneConfig(Register=RegisterEnum.path, Path=['/mod_info.json'],
                              FromOriginal=self.inModInfo, ToLocalization=self.outModInfo)
         # 原版 - 行星类型（planets.json）的数据
-        self.ImportOneConfig(Register=path, Path=['/data/config/planets.json'],
+        self.ImportOneConfig(Register=RegisterEnum.path, Path=['/data/config/planets.json'],
                              FromOriginal=self.inPlanets, ToLocalization=self.outPlanets)
         # 原版 - 局部战斗中的可占领战术点（比如通讯中继站/传感干扰器）数据
-        self.ImportOneConfig(Register=path, Path=['/data/config/battle_objectives.json'],
+        self.ImportOneConfig(Register=RegisterEnum.path, Path=['/data/config/battle_objectives.json'],
                              FromOriginal=self.inBattleObjectives, ToLocalization=self.outBattleObjectives)
         # 原版 - settings.json中的数据
-        self.ImportOneConfig(Register=path, Path=['/data/config/settings.json'],
+        self.ImportOneConfig(Register=RegisterEnum.path, Path=['/data/config/settings.json'],
                              FromOriginal=self.inSettings, ToLocalization=self.outSettings)
 
     # data/missions/*
@@ -509,13 +528,17 @@ class SubParatranz(ParatrazProject):
     # data/world/factions/*.faction
     def inFactions(self, *args):
         with open(args[0], encoding='UTF-8') as tFile:
-            tFileContent: dict = json5.loads(self.__quoteSpecialDataForIn(re.compile('^"?tags"?'), self.__filterJSON5(tFile.read())))
+            tFileContent: dict = json5.loads(
+                self.__quoteSpecialDataForIn(re.compile('^"?tags"?'), self.__filterJSON5(tFile.read())))
         # 预定义关键字解析
         result = []
+        # 240819：增补了对势力文件中部分势力名称Key的注解
+        hintDict = {'displayName': '势力短名称', 'displayNameWithArticle': '带冠词的势力短名称',
+                    'displayNameLong': '势力的书面正式名称', 'displayNameLongWithArticle': '带冠词的势力的书面正式名称'}
         for strKey in ('displayName', 'displayNameWithArticle', 'displayNameLong', 'displayNameLongWithArticle',
                        'displayNameIsOrAre'):
             if strKey in tFileContent:
-                result.append(self.__buildDict(f'root#{strKey}', tFileContent.get(strKey)))
+                result.append(self.__buildDict(f'root#{strKey}', tFileContent.get(strKey), hintDict.get(strKey)))
                 if strKey == 'displayNameIsOrAre':  # 240729：往刚刚增加的翻译文本里覆写默认数据
                     result[-1].translation = '是'
                     result[-1].stage = 1
@@ -526,17 +549,25 @@ class SubParatranz(ParatrazProject):
                 for secondKey in ranksDict.get(firstKey).keys():
                     if 'name' in ranksDict.get(firstKey).get(secondKey):
                         result.append(self.__buildDict(f"ranks#{firstKey}#{secondKey}#name",
-                                                       ranksDict.get(firstKey).get(secondKey).get('name')))
+                                                       ranksDict.get(firstKey).get(secondKey).get('name'),
+                                                       '通讯目录/舰船对话中的人显示的阶级（Rank）名称'))
         # 阶级？
         if 'fleetTypeNames' in tFileContent:
             fleetNames: Dict[str, str] = tFileContent.get('fleetTypeNames')
+            # 240819：增补了对势力文件中舰队名称部分Key的注解
+            hintDict = {'trade': '势力派出的大型贸易舰队的名称', 'tradeLiner': '势力派出的前往Galatia学院的航班的名称',
+                        'tradeSmuggler': '由该势力派出的，在势力之间走私商品的走私舰队名称',
+                        'smallTrader': '势力派出的小型贸易舰队的名称', 'patrolSmall': '势力派出的小型巡逻队的名称',
+                        'patrolMedium': '势力派出的中型巡逻队的名称', 'patrolLarge': '势力派出的大型巡逻队的名称'}
             for firstKey in fleetNames.keys():
-                result.append(self.__buildDict(f'fleetTypeNames#{firstKey}', fleetNames.get(firstKey)))
+                result.append(self.__buildDict(f'fleetTypeNames#{firstKey}', fleetNames.get(firstKey),
+                                               hintDict.get(firstKey)))
         self.__writeParatranzJSON(result, args[1])
 
     def outFactions(self, *args):
         with open(args[0], encoding='UTF-8') as tFile:
-            preContent, toReplaceData = self.__quoteSpecialDataForOut(re.compile('^"?tags"?'), self.__filterJSON5(tFile.read()))
+            preContent, toReplaceData = self.__quoteSpecialDataForOut(re.compile('^"?tags"?'),
+                                                                      self.__filterJSON5(tFile.read()))
             tOriginal: dict = json5.loads(preContent)
         # 读取原文文件内容
         tTranslation = self.__readParatranzJSON(args[1])
@@ -579,12 +610,13 @@ class SubParatranz(ParatrazProject):
         tFile.close()
         # 读取原文文件内容
         result = []
-        fastMD5 = lambda s : md5(s.encode('UTF-8')).hexdigest()
+        fastMD5 = lambda s: md5(s.encode('UTF-8')).hexdigest()
         for strUnit in tOriginal.get('tips'):  # 以原文MD5作为唯一key，从而规避掉顺序改变引起的Paratranz重复劳动
             if isinstance(strUnit, str):
                 result.append(self.__buildDict(f'tips#{fastMD5(strUnit)}', strUnit))
             elif isinstance(strUnit, dict):
-                result.append(self.__buildDict(f'tips#{fastMD5(strUnit.get("tip"))}${strUnit.get("freq")}', strUnit.get('tip')))
+                result.append(
+                    self.__buildDict(f'tips#{fastMD5(strUnit.get("tip"))}${strUnit.get("freq")}', strUnit.get('tip')))
         self.__writeParatranzJSON(result, args[1])
 
     def outTips(self, *args):
@@ -701,9 +733,11 @@ class SubParatranz(ParatrazProject):
         for eventUnit in tOriginal:
             stageID = eventUnit.get('stage')
             result.append(
-                self.__buildDict(f'event#{stageID}$name', eventUnit.get('name'), "外交事件：\n" + pprint.pformat(eventUnit, sort_dicts=False)))
+                self.__buildDict(f'event#{stageID}$name', eventUnit.get('name'),
+                                 "外交事件：\n" + pprint.pformat(eventUnit, sort_dicts=False)))
             result.append(
-                self.__buildDict(f'event#{stageID}$desc', eventUnit.get('desc'), "外交事件：\n" + pprint.pformat(eventUnit, sort_dicts=False)))
+                self.__buildDict(f'event#{stageID}$desc', eventUnit.get('desc'),
+                                 "外交事件：\n" + pprint.pformat(eventUnit, sort_dicts=False)))
         self.__writeParatranzJSON(result, args[1])
 
     def outDiplomacyConfig(self, *args):
@@ -752,11 +786,13 @@ class SubParatranz(ParatrazProject):
         with open(args[0], encoding='UTF-8') as tFile:
             tOriginal: Dict[str, dict] = json5.loads(self.__filterJSON5(tFile.read()))
         result = []
+        # 240819：增补了对高价值赏金（HVB）中部分Key的注解
+        hintDict = {'job_name': '赏金名称', 'job_description': '赏金的说明文本', 'job_comm_reply': '玩家与赏金目标进行交互时，对面给的回复', 'job_intel_success': '赏金完成后，玩家在网络信息面板上看到的消息文本。', 'job_intel_failure': '赏金舰队被非玩家摧毁后，玩家在网络信息面板上看到的消息文本。', 'fleet_name': '赏金目标的舰队名称', 'fleet_flagship_name': '赏金目标的座舰的名称', 'job_intel_expired': '赏金超期而未被完成，玩家在网络信息面板上看到的消息文本。', 'job_difficultyDescription': '赏金的难度描述文本（推测）。'}
         for bountyID in tOriginal:
-            for paraName in ('job_name', 'job_description', 'job_comm_reply', 'job_intel_success', 'job_intel_failure',
-                             'fleet_name', 'fleet_flagship_name'):
+            for paraName in hintDict.keys():
                 if paraName in tOriginal[bountyID]:
-                    result.append(self.__buildDict(f'{bountyID}#{paraName}', tOriginal[bountyID].get(paraName), f'[本行原始数据]\n{pprint.pformat(tOriginal[bountyID], sort_dicts=False)}'))
+                    result.append(self.__buildDict(f'{bountyID}#{paraName}', tOriginal[bountyID].get(paraName),
+                                                   f'{hintDict.get(paraName)}\n\n[本行原始数据]\n{pprint.pformat(tOriginal[bountyID], sort_dicts=False)}'))
         self.__writeParatranzJSON(result, args[1])
 
     def outMagicBountyData(self, *args):
@@ -766,18 +802,32 @@ class SubParatranz(ParatrazProject):
     def inExerelinFactionConfig(self, *args):
         toTranslateKeys = ('ngcTooltip', 'rebelFleetSuffix', 'asteroidMiningFleetName', 'gasMiningFleetName',
                            'invasionFleetName', 'responseFleetName', 'invasionSupportFleetName', 'defenceFleetName',
-                           'suppressionFleetName', 'vengeanceLevelNames', 'vengeanceFleetNames', 'vengeanceFleetNamesSingle')
+                           'suppressionFleetName', 'vengeanceLevelNames', 'vengeanceFleetNames',
+                           'vengeanceFleetNamesSingle')
+        # 240819：增补了对势力争霸mod中部分舰队名称Key的注解
+        hintDict = {'rebelFleetSuffix': '势力争霸mod中的重生舰队名称后缀',
+                    'asteroidMiningFleetName': '势力争霸mod中从殖民地派出的小行星采矿舰队名称',
+                    'gasMiningFleetName': '势力争霸mod中从殖民地派出的挥发物开采舰队的名称',
+                    'invasionFleetName': '势力争霸mod中的入侵舰队名称',
+                    'invasionSupportFleetName': '势力争霸mod中的入侵辅助舰队名称',
+                    'defenceFleetName': '势力争霸mod中势力派出的防御舰队的名称',
+                    'suppressionFleetName': '势力争霸mod中势力派出用于镇压殖民地叛乱的支援舰队的名称', 
+                    'vengeanceLevelNames': '势力争霸mod中派出的复仇舰队名称',
+                    'vengeanceFleetNames': '势力争霸mod中派出的复仇舰队名称',
+                    'vengeanceFleetNamesSingle': '势力争霸mod中派出的复仇舰队名称'}
         with open(args[0], encoding='UTF-8') as tFile:
             tOriginal: dict = json5.loads(self.__filterJSON5(tFile.read()))
         result = []
         for translateKey in toTranslateKeys:
             if translateKey in tOriginal:
                 if isinstance(tOriginal.get(translateKey), str):
-                    result.append(self.__buildDict(translateKey, tOriginal.get(translateKey)))
+                    result.append(self.__buildDict(translateKey, tOriginal.get(translateKey), hintDict.get(translateKey)))
                 elif isinstance(tOriginal.get(translateKey), list):
                     for unitID in range(len(tOriginal.get(translateKey))):
                         if isinstance(tOriginal.get(translateKey)[unitID], str):
-                            result.append(self.__buildDict(f'{translateKey}${unitID}', tOriginal.get(translateKey)[unitID]))
+                            result.append(
+                                self.__buildDict(f'{translateKey}${unitID}', tOriginal.get(translateKey)[unitID],
+                                                 hintDict.get(translateKey)))
         self.__writeParatranzJSON(result, args[1])
 
     def outExerelinFactionConfig(self, *args):
@@ -828,7 +878,8 @@ class SubParatranz(ParatrazProject):
             tOriginal: dict = json5.loads(self.__filterJSON5(tFile.read()))
         result = []
         if 'hullName' in tOriginal:
-            result.append(self.__buildDict(f'root#hullName', tOriginal['hullName'], f'[本行原始数据]\n{pprint.pformat(tOriginal, sort_dicts=False)}'))
+            result.append(self.__buildDict(f'root#hullName', tOriginal['hullName'],
+                                           f'[本行原始数据]\n{pprint.pformat(tOriginal, sort_dicts=False)}'))
         self.__writeParatranzJSON(result, args[1])
 
     def outShipFile(self, *args):
@@ -837,16 +888,19 @@ class SubParatranz(ParatrazProject):
     # data/hulls/skins/*.skin
     def inHullSkinFile(self, *args):
         with open(args[0], encoding='UTF-8') as tFile:
-            tOriginal: dict = json5.loads(self.__quoteSpecialDataForIn(re.compile('^"?(hints|removeHints|addHints)"?:'), self.__filterJSON5(tFile.read())))
+            tOriginal: dict = json5.loads(self.__quoteSpecialDataForIn(re.compile('^"?(hints|removeHints|addHints)"?:'),
+                                                                       self.__filterJSON5(tFile.read())))
         result = []
         for keyStr in ('hullName', 'descriptionPrefix', 'tech'):
             if keyStr in tOriginal:
-                result.append(self.__buildDict(f'root#{keyStr}', tOriginal[keyStr], f'[本行原始数据]\n{pprint.pformat(tOriginal, sort_dicts=False)}'))
+                result.append(self.__buildDict(f'root#{keyStr}', tOriginal[keyStr],
+                                               f'[本行原始数据]\n{pprint.pformat(tOriginal, sort_dicts=False)}'))
         self.__writeParatranzJSON(result, args[1])
 
     def outHullSkinFile(self, *args):
         with open(args[0], encoding='UTF-8') as tFile:
-            preContent, toReplaceData = self.__quoteSpecialDataForOut(re.compile('^"?(hints|removeHints|addHints)"?:'), self.__filterJSON5(tFile.read()))
+            preContent, toReplaceData = self.__quoteSpecialDataForOut(re.compile('^"?(hints|removeHints|addHints)"?:'),
+                                                                      self.__filterJSON5(tFile.read()))
             tOriginal = json5.loads(preContent)
         for unit in self.__readParatranzJSON(args[1]):
             if unit.isTranslated:
@@ -878,20 +932,22 @@ class SubParatranz(ParatrazProject):
             if unit.isTranslated:
                 result.append({'id': self.__getTranslation(unit)})
         with open(args[2], 'w', newline='', encoding='UTF-8') as tFile:
-            tVar = csv.DictWriter(tFile, list(result[0].keys()))
+            tVar = csv.DictWriter(tFile, ['id'])
             tVar.writeheader()
             tVar.writerows(result)
 
     # data/config/custom_entities.json
     def inCustomEntity(self, *args):
         with open(args[0], encoding='UTF-8') as tFile:
-            tOriginal: dict = json5.loads(self.__quoteSpecialDataForIn(re.compile('^"layers":'), self.__filterJSON5(tFile.read())))
+            tOriginal: dict = json5.loads(
+                self.__quoteSpecialDataForIn(re.compile('^"layers":'), self.__filterJSON5(tFile.read())))
         result = []
         for firstKey in tOriginal:
             secondDict: dict = tOriginal[firstKey]
             for unit in ('defaultName', 'nameInText', 'shortName', 'aOrAn', 'isOrAre'):
                 if unit in secondDict and len(secondDict[unit]) > 0:
-                    result.append(self.__buildDict(f'{firstKey}#{unit}', secondDict[unit], f'[本行原始数据]\n{pprint.pformat(secondDict, sort_dicts=False)}'))
+                    result.append(self.__buildDict(f'{firstKey}#{unit}', secondDict[unit],
+                                                   f'[本行原始数据]\n{pprint.pformat(secondDict, sort_dicts=False)}'))
                     if unit == 'aOrAn':
                         result[-1].stage = 1
                         result[-1].translation = '一个'
@@ -902,7 +958,8 @@ class SubParatranz(ParatrazProject):
 
     def outCustomEntity(self, *args):
         with open(args[0], encoding='UTF-8') as tFile:
-            preContent, toReplaceData = self.__quoteSpecialDataForOut(re.compile('^"layers"'), self.__filterJSON5(tFile.read()))
+            preContent, toReplaceData = self.__quoteSpecialDataForOut(re.compile('^"layers"'),
+                                                                      self.__filterJSON5(tFile.read()))
             tOriginal: dict = json5.loads(preContent)
         for unit in self.__readParatranzJSON(args[1]):
             if unit.isTranslated:
@@ -930,20 +987,22 @@ class SubParatranz(ParatrazProject):
                 extraNumber = ''
                 if line_FieldID == '':
                     continue
-                if line_FieldID in tVar1: # 需要特别关照的重复键值将打上不同的ID，以便paratranz能认出来
+                if line_FieldID in tVar1:  # 需要特别关照的重复键值将打上不同的ID，以便paratranz能认出来
                     extraNumber = f'${tVar1[line_FieldID]}'
                     tVar1[line_FieldID] += 1
                 if lineDict['fieldType'] in ('Header', 'Text'):  # 检测到特殊头部信息
                     result.append(
                         self.__buildDict(f'{line_FieldID}#defaultValue{extraNumber}', lineDict['defaultValue'],
                                          f'[本行原始数据]\n{pprint.pformat(lineDict, sort_dicts=False)}'))
-                elif lineDict['fieldType'] == 'Radio': # 字符串单选数据特别处理
+                elif lineDict['fieldType'] == 'Radio':  # 字符串单选数据特别处理
                     for keyStr in ('fieldName', 'fieldDescription', 'defaultValue'):
                         if keyStr in lineDict and lineDict[keyStr].strip() != '':
                             result.append(self.__buildDict('{0}#{1}{2}'.format(line_FieldID, keyStr, extraNumber),
                                                            lineDict[keyStr],
                                                            f'[本行原始数据]\n{pprint.pformat(lineDict, sort_dicts=False)}'))
-                    result.append(self.__buildDict('{0}#{1}{2}'.format(line_FieldID, 'secondaryValue', extraNumber), lineDict['secondaryValue'], f'注意：请在翻译时保留英文逗号，它是数据之间的分割线！如果一定要使用逗号，特别允许使用中文逗号！\n[本行原始数据]\n{pprint.pformat(lineDict, sort_dicts=False)}'))
+                    result.append(self.__buildDict('{0}#{1}{2}'.format(line_FieldID, 'secondaryValue', extraNumber),
+                                                   lineDict['secondaryValue'],
+                                                   f'注意：请在翻译时保留英文逗号，它是数据之间的分割线！如果一定要使用逗号，特别允许使用中文逗号！\n[本行原始数据]\n{pprint.pformat(lineDict, sort_dicts=False)}'))
                 else:
                     for keyStr in ('fieldName', 'fieldDescription'):
                         if keyStr in lineDict and lineDict[keyStr].strip() != '':
@@ -1004,7 +1063,8 @@ class SubParatranz(ParatrazProject):
         result = []
         for planetID in tOriginal:
             if 'name' in tOriginal[planetID]:
-                result.append(self.__buildDict(f'{planetID}#name', tOriginal[planetID]['name'], f'行星类型（{planetID}）的名称'))
+                result.append(
+                    self.__buildDict(f'{planetID}#name', tOriginal[planetID]['name'], f'行星类型（{planetID}）的名称'))
         self.__writeParatranzJSON(result, args[1])
 
     def outPlanets(self, *args):
@@ -1026,7 +1086,8 @@ class SubParatranz(ParatrazProject):
         # 调查所有涉及的文件
         mainFolderPath = str(args[0]).rpartition(os_sep)[0].rpartition(os_sep)[0]
         otherDesignType = set()
-        for filePath in [('hullmods', 'hull_mods.csv'), ('hulls', 'ship_data.csv'), ('weapons', 'weapon_data.csv'), ('campaign', 'special_items.csv')]:
+        for filePath in [('hullmods', 'hull_mods.csv'), ('hulls', 'ship_data.csv'), ('weapons', 'weapon_data.csv'),
+                         ('campaign', 'special_items.csv')]:
             realFilePath = path_join(mainFolderPath, *filePath)
             if isfile(realFilePath):
                 with open(realFilePath, encoding='UTF-8') as tFile:
@@ -1037,7 +1098,8 @@ class SubParatranz(ParatrazProject):
                                 otherDesignType.add(tVar.strip())
         for targetUnit in (otherDesignType & allDesignType):
             tMD5 = md5(targetUnit.encode()).hexdigest()
-            result.append(self.__buildDict(f'designTypeColors#{tMD5}', targetUnit, '要渲染的舰船/武器/船插/LPC的设计类型名称，比如 “扩展纪元”/“核心纪元”/“主宰纪元”'))
+            result.append(self.__buildDict(f'designTypeColors#{tMD5}', targetUnit,
+                                           '要渲染的舰船/武器/船插/LPC的设计类型名称，比如 “扩展纪元”/“核心纪元”/“主宰纪元”'))
         self.__writeParatranzJSON(result, args[1])
 
     def outSettings(self, *args):
@@ -1073,7 +1135,7 @@ class SubParatranz(ParatrazProject):
                 fileContent = fileContent.replace(f'{number}f', str(number))
         tVar = []
         replace1 = re.compile('[^\\\\]",?[ \t]*#')  # strings.json定位
-        replace2 = re.compile('(\\d|true|false|]|}|\[),?[ \t]*#')  # 通用定位数据
+        replace2 = re.compile('(\\d|true|false|]|}|\\[),?[ \t]*#')  # 通用定位数据
         for line in fileContent.splitlines():
             line = line.strip()
             if line.startswith('#') or len(line) == 0:
@@ -1140,6 +1202,8 @@ class SubParatranz(ParatrazProject):
         result = {}
         tVar = set()
         for unit in toExtractDataList:
+            if [x.strip().startswith('#') for x in unit.values()].count(True) > 0:
+                continue  # 检测到任意文本以注释符`#`开头，判定该行可能是注释，予以排除
             if keyStr in unit and unit[keyStr].strip() != '':
                 if unit[keyStr] in tVar:
                     result[unit[keyStr]] = 1
@@ -1159,12 +1223,12 @@ class SubParatranz(ParatrazProject):
         :return: 已重新编码的数据。
         """
         preContentList = preContent.splitlines()
-        const_searchEngine = re.compile('[A-Za-z0-9_]+')
-        const_referenceEngine = re.compile('"[A-Za-z0-9_]+"')
+        const_searchEngine = re.compile('[A-Za-z0-9_.]+')
+        const_referenceEngine = re.compile('"[A-Za-z0-9_.]+"')
         for lineID in range(len(preContentList)):
             if filterFunction.search(preContentList[lineID]) is not None:
                 line = preContentList[lineID]
-                headStr, _ , line = line.partition(':')
+                headStr, _, line = line.partition(':')
                 if '//' in line:
                     line, _, hintText = line.partition('//')
                 else:
@@ -1200,8 +1264,8 @@ class SubParatranz(ParatrazProject):
         :return: 已处理好的字符串 | 在之后提取时使用到的字符串集合。
         """
         preContentList = preContent.splitlines()
-        const_searchEngine = re.compile('[A-Za-z0-9_]+')
-        const_referenceEngine = re.compile('"[A-Za-z0-9_]+"')
+        const_searchEngine = re.compile('[A-Za-z0-9_.]+')
+        const_referenceEngine = re.compile('"[A-Za-z0-9_.]+"')
         hashID = 1
         result = []
         for lineID in range(len(preContentList)):

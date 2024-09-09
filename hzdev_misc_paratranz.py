@@ -811,7 +811,7 @@ class SubParatranz(ParatrazProject):
                     'invasionFleetName': '势力争霸mod中的入侵舰队名称',
                     'invasionSupportFleetName': '势力争霸mod中的入侵辅助舰队名称',
                     'defenceFleetName': '势力争霸mod中势力派出的防御舰队的名称',
-                    'suppressionFleetName': '势力争霸mod中势力派出用于镇压殖民地叛乱的支援舰队的名称', 
+                    'suppressionFleetName': '势力争霸mod中势力派出用于镇压殖民地叛乱的支援舰队的名称',
                     'vengeanceLevelNames': '势力争霸mod中派出的复仇舰队名称',
                     'vengeanceFleetNames': '势力争霸mod中派出的复仇舰队名称',
                     'vengeanceFleetNamesSingle': '势力争霸mod中派出的复仇舰队名称'}
@@ -1135,7 +1135,7 @@ class SubParatranz(ParatrazProject):
                 fileContent = fileContent.replace(f'{number}f', str(number))
         tVar = []
         replace1 = re.compile('[^\\\\]",?[ \t]*#')  # strings.json定位
-        replace2 = re.compile('(\\d|true|false|]|}|\\[),?[ \t]*#')  # 通用定位数据
+        replace2 = re.compile('(\\d|true|false|]|}|\\{|\\[),?[ \t]*#')  # 通用定位数据
         for line in fileContent.splitlines():
             line = line.strip()
             if line.startswith('#') or len(line) == 0:

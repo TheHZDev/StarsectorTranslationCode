@@ -610,13 +610,12 @@ class SubParatranz(ParatrazProject):
         tFile.close()
         # 读取原文文件内容
         result = []
-        fastMD5 = lambda s: md5(s.encode('UTF-8')).hexdigest()
         for strUnit in tOriginal.get('tips'):  # 以原文MD5作为唯一key，从而规避掉顺序改变引起的Paratranz重复劳动
             if isinstance(strUnit, str):
-                result.append(self.__buildDict(f'tips#{fastMD5(strUnit)}', strUnit))
+                result.append(self.__buildDict(f'tips#{self.__simpleMD5(strUnit)}', strUnit))
             elif isinstance(strUnit, dict):
                 result.append(
-                    self.__buildDict(f'tips#{fastMD5(strUnit.get("tip"))}${strUnit.get("freq")}', strUnit.get('tip')))
+                    self.__buildDict(f'tips#{self.__simpleMD5(strUnit.get("tip"))}${strUnit.get("freq")}', strUnit.get('tip')))
         self.__writeParatranzJSON(result, args[1])
 
     def outTips(self, *args):
@@ -915,15 +914,13 @@ class SubParatranz(ParatrazProject):
     def inDeathCauses(self, *args):
         result = []
         with open(args[0], encoding='UTF-8') as tFile:
-            textID = 1
             for line in list(csv.DictReader(tFile)):
                 contextText = None
                 if 'combat' in args[0]:
                     contextText = '该宠物在战斗中与被毁舰船一起共存亡了'
                 elif 'hamster' in args[0]:
                     contextText = '这是一只hamster（仓鼠），自然死亡时的死因描述'
-                result.append(self.__buildDict(f'id#{textID}', line['id'], contextText))
-                textID += 1
+                result.append(self.__buildDict(f'id#{self.__simpleMD5(line["id"])}', line['id'], contextText))
         self.__writeParatranzJSON(result, args[1])
 
     def outDeathCauses(self, *args):
@@ -1048,7 +1045,7 @@ class SubParatranz(ParatrazProject):
         with open(args[0], encoding='UTF-8') as tFile:
             tOriginal: dict = json5.loads(self.__filterJSON5(tFile.read()))
         result = []
-        hintBox = {'name': '本Mod的名称', 'description': '本mod的描述'}
+        hintBox = {'name': '本Mod的名称', 'description': '本Mod的描述'}
         for unitKey in hintBox:
             result.append(self.__buildDict(f'root#{unitKey}', tOriginal[unitKey], hintBox[unitKey]))
         self.__writeParatranzJSON(result, args[1])
@@ -1097,8 +1094,7 @@ class SubParatranz(ParatrazProject):
                             if len(tVar.strip()) > 0:
                                 otherDesignType.add(tVar.strip())
         for targetUnit in (otherDesignType & allDesignType):
-            tMD5 = md5(targetUnit.encode()).hexdigest()
-            result.append(self.__buildDict(f'designTypeColors#{tMD5}', targetUnit,
+            result.append(self.__buildDict(f'designTypeColors#{self.__simpleMD5(targetUnit)}', targetUnit,
                                            '要渲染的舰船/武器/船插/LPC的设计类型名称，比如 “扩展纪元”/“核心纪元”/“主宰纪元”'))
         self.__writeParatranzJSON(result, args[1])
 
@@ -1135,7 +1131,8 @@ class SubParatranz(ParatrazProject):
                 fileContent = fileContent.replace(f'{number}f', str(number))
         tVar = []
         replace1 = re.compile('[^\\\\]",?[ \t]*#')  # strings.json定位
-        replace2 = re.compile('(\\d|true|false|]|}|\\{|\\[),?[ \t]*#')  # 通用定位数据
+        replace2 = re.compile('(\\d|true|false|]|}|\\{|\\[),?[ \t]*#', re.IGNORECASE)  # 通用定位数据
+        replace3 = re.compile(': *(TRUE|FALSE),?', re.IGNORECASE)
         for line in fileContent.splitlines():
             line = line.strip()
             if line.startswith('#') or len(line) == 0:
@@ -1149,6 +1146,9 @@ class SubParatranz(ParatrazProject):
             elif replace2.search(line) is not None:
                 tStr = replace2.search(line).group()
                 line = line.replace(tStr, tStr[:-1] + '//')
+            if replace3.search(line) is not None:  # 给settings.json里讨人厌的代码纠错
+                tStr = replace3.search(line).group()
+                line = line.replace(tStr, tStr.lower())
             tVar.append(line)
         return '\n'.join(tVar)
 
@@ -1171,6 +1171,10 @@ class SubParatranz(ParatrazProject):
     @staticmethod
     def __getTranslation(toGet: ParatranzDataUnit):
         return toGet.translation.replace('\\n', '\n')
+
+    @staticmethod
+    def __simpleMD5(toHashText: str):
+        return md5(toHashText.encode('UTF-8')).hexdigest()
 
     def __commonTranslateFunc_v1(self, *args):
         """提供一些只有一层json的翻译函数。"""

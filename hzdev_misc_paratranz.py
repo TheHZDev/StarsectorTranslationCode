@@ -529,7 +529,7 @@ class SubParatranz(ParatrazProject):
     def inFactions(self, *args):
         with open(args[0], encoding='UTF-8') as tFile:
             tFileContent: dict = json5.loads(
-                self.__quoteSpecialDataForIn(re.compile('^"?tags"?'), self.__filterJSON5(tFile.read())))
+                self.__quoteSpecialDataForIn(re.compile('^"?tags"?: *\\['), self.__filterJSON5(tFile.read())))
         # 预定义关键字解析
         result = []
         # 240819：增补了对势力文件中部分势力名称Key的注解
@@ -566,7 +566,7 @@ class SubParatranz(ParatrazProject):
 
     def outFactions(self, *args):
         with open(args[0], encoding='UTF-8') as tFile:
-            preContent, toReplaceData = self.__quoteSpecialDataForOut(re.compile('^"?tags"?'),
+            preContent, toReplaceData = self.__quoteSpecialDataForOut(re.compile('^"?tags"?: *\\['),
                                                                       self.__filterJSON5(tFile.read()))
             tOriginal: dict = json5.loads(preContent)
         # 读取原文文件内容

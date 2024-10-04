@@ -459,6 +459,9 @@ class SubParatranz(ParatrazProject):
         # 原版 - settings.json中的数据
         self.ImportOneConfig(Register=RegisterEnum.path, Path=['/data/config/settings.json'],
                              FromOriginal=self.inSettings, ToLocalization=self.outSettings)
+        # 原版 - 技能详细数据（*.skill）的部分待翻译数据
+        self.ImportOneConfig(Register=RegisterEnum.folder_ext, Folder_Ext=[('/data/characters/skills/', 'skill')],
+                             FromOriginal=self.inSkill, ToLocalization=self.inSkill)
 
     # data/missions/*
     def inMissions(self, *args):
@@ -615,7 +618,8 @@ class SubParatranz(ParatrazProject):
                 result.append(self.__buildDict(f'tips#{self.__simpleMD5(strUnit)}', strUnit))
             elif isinstance(strUnit, dict):
                 result.append(
-                    self.__buildDict(f'tips#{self.__simpleMD5(strUnit.get("tip"))}${strUnit.get("freq")}', strUnit.get('tip')))
+                    self.__buildDict(f'tips#{self.__simpleMD5(strUnit.get("tip"))}${strUnit.get("freq")}',
+                                     strUnit.get('tip')))
         self.__writeParatranzJSON(result, args[1])
 
     def outTips(self, *args):
@@ -786,7 +790,13 @@ class SubParatranz(ParatrazProject):
             tOriginal: Dict[str, dict] = json5.loads(self.__filterJSON5(tFile.read()))
         result = []
         # 240819：增补了对高价值赏金（HVB）中部分Key的注解
-        hintDict = {'job_name': '赏金名称', 'job_description': '赏金的说明文本', 'job_comm_reply': '玩家与赏金目标进行交互时，对面给的回复', 'job_intel_success': '赏金完成后，玩家在网络信息面板上看到的消息文本。', 'job_intel_failure': '赏金舰队被非玩家摧毁后，玩家在网络信息面板上看到的消息文本。', 'fleet_name': '赏金目标的舰队名称', 'fleet_flagship_name': '赏金目标的座舰的名称', 'job_intel_expired': '赏金超期而未被完成，玩家在网络信息面板上看到的消息文本。', 'job_difficultyDescription': '赏金的难度描述文本（推测）。'}
+        hintDict = {'job_name': '赏金名称', 'job_description': '赏金的说明文本',
+                    'job_comm_reply': '玩家与赏金目标进行交互时，对面给的回复',
+                    'job_intel_success': '赏金完成后，玩家在网络信息面板上看到的消息文本。',
+                    'job_intel_failure': '赏金舰队被非玩家摧毁后，玩家在网络信息面板上看到的消息文本。',
+                    'fleet_name': '赏金目标的舰队名称', 'fleet_flagship_name': '赏金目标的座舰的名称',
+                    'job_intel_expired': '赏金超期而未被完成，玩家在网络信息面板上看到的消息文本。',
+                    'job_difficultyDescription': '赏金的难度描述文本（推测）。'}
         for bountyID in tOriginal:
             for paraName in hintDict.keys():
                 if paraName in tOriginal[bountyID]:
@@ -820,7 +830,8 @@ class SubParatranz(ParatrazProject):
         for translateKey in toTranslateKeys:
             if translateKey in tOriginal:
                 if isinstance(tOriginal.get(translateKey), str):
-                    result.append(self.__buildDict(translateKey, tOriginal.get(translateKey), hintDict.get(translateKey)))
+                    result.append(
+                        self.__buildDict(translateKey, tOriginal.get(translateKey), hintDict.get(translateKey)))
                 elif isinstance(tOriginal.get(translateKey), list):
                     for unitID in range(len(tOriginal.get(translateKey))):
                         if isinstance(tOriginal.get(translateKey)[unitID], str):
@@ -1120,6 +1131,43 @@ class SubParatranz(ParatrazProject):
 
     def outBattleObjectives(self, *args):
         self.__commonTranslateFunc_v2(*args)
+
+    # data/characters/skills/*.skill
+    def inSkill(self, *args):
+        with open(args[0], encoding='UTF-8') as tFile:
+            t0 = tFile.read()
+            for t2 in re.findall('"?scope\\d?"? *: *CUSTOM', t0):
+                t3 = t2.split(':').strip()
+                t0 = t0.replace(t2, t3 + ':"CUSTOM"')
+            tOriginal: dict = json5.loads(self.__filterJSON5(t0))
+        # 以上操作是为了过滤某些又不好好写文件的SB Modder
+        result = []
+        for unitKey in tOriginal.keys():
+            if re.fullmatch('^scopeStr\\d*$', unitKey) is not None:
+                result.append(self.__buildDict(f'root#{unitKey}', tOriginal[unitKey], f'技能的适用范围\n\n[本行原始数据]\n{pprint.pformat(tOriginal, sort_dicts=False)}'))
+        if 'effectGroups' in tOriginal:
+            for skillSubUnitID in range(len(tOriginal['effectGroups'])):
+                skillSubUnit = tOriginal['effectGroups'][skillSubUnitID]
+                if 'name' in skillSubUnit:
+                    result.append(self.__buildDict(f'effectGroups#{skillSubUnitID}$name', skillSubUnit['name'], f'技能的等级名称\n\n[本行原始数据]\n{pprint.pformat(skillSubUnit, sort_dicts=False)}'))
+        self.__writeParatranzJSON(result, args[1])
+
+    def outSkill(self, *args):
+        with open(args[0], encoding='UTF-8') as tFile:
+            t0 = tFile.read()
+            for t2 in re.findall('"?scope\\d?"? *: *CUSTOM', t0):
+                t3 = t2.split(':').strip()
+                t0 = t0.replace(t2, t3 + ':"CUSTOM"')
+            tOriginal: dict = json5.loads(self.__filterJSON5(t0))
+        for unit in self.__readParatranzJSON(args[1]):
+            if unit.isTranslated:
+                if unit.key.startswith('root#'):
+                    tOriginal[unit.key.split('#')[1]] = unit.translation
+                elif unit.key.startswith('effectGroups#'):
+                    groupID, keyName = unit.key.split('#')[1].split('$')
+                    tOriginal['effectGroups'][int(groupID)][keyName] = unit.translation
+        with open(args[2], 'w', encoding='UTF-8') as tFile:
+            json.dump(tOriginal, tFile, ensure_ascii=False, indent=4)
 
     @staticmethod
     def __filterJSON5(fileContent: str):

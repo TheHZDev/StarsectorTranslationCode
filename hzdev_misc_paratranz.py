@@ -462,6 +462,9 @@ class SubParatranz(ParatrazProject):
         # 原版 - 技能详细数据（*.skill）的部分待翻译数据
         self.ImportOneConfig(Register=RegisterEnum.folder_ext, Folder_Ext=[('/data/characters/skills/', 'skill')],
                              FromOriginal=self.inSkill, ToLocalization=self.inSkill)
+        # 前线秘闻mod - 该mod自行实现的一套类似"战斗骚话mod"的文本
+        self.ImportOneConfig(Register=RegisterEnum.path, Path=['/data/config/sotf/sotf_officerConvos.json'],
+                             FromOriginal=self.inSoTFOfficerConvos, ToLocalization=self.outSoTFOfficerConvos)
 
     # data/missions/*
     def inMissions(self, *args):
@@ -1168,6 +1171,30 @@ class SubParatranz(ParatrazProject):
                     tOriginal['effectGroups'][int(groupID)][keyName] = unit.translation
         with open(args[2], 'w', encoding='UTF-8') as tFile:
             json.dump(tOriginal, tFile, ensure_ascii=False, indent=4)
+
+    # data/config/sotf/sotf_officerConvos.json
+    def inSoTFOfficerConvos(self, *args):
+        with open(args[0], encoding='UTF-8') as tFile:
+            tOriginal: dict = json5.loads(self.__filterJSON5(tFile.read()))
+        result = []
+        for unitKey in tOriginal:
+            descText = pprint.pformat({unitKey: tOriginal[unitKey]}, sort_dicts=False)
+            if 'lines' in tOriginal[unitKey]:
+                tList: list = tOriginal[unitKey]['lines']
+                for lineID in range(len(tList)):
+                    result.append(self.__buildDict(f'{unitKey}#{lineID}', tList[lineID][1],
+                                                   f'军官ID为[{tList[lineID][0]}]的战斗骚话文本\n\n[本行原始数据]\n{descText}'))
+        self.__writeParatranzJSON(result, args[1])
+
+    def outSoTFOfficerConvos(self, *args):
+        with open(args[0], encoding='UTF-8') as tFile:
+            tOriginal: dict = json5.loads(self.__filterJSON5(tFile.read()))
+        for unit in self.__readParatranzJSON(args[1]):
+            if unit.isTranslated:
+                key, numID = unit.key.split('#')
+                tOriginal[key]['lines'][int(numID)][1] = unit.translation
+        with open(args[2], 'w', encoding='UTF-8') as tFile:
+            json5.dump(tOriginal, tFile, indent=4, ensure_ascii=False)
 
     @staticmethod
     def __filterJSON5(fileContent: str):

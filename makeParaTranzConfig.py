@@ -84,7 +84,7 @@ const_refData = {
     },
     'data/campaign/aotd_tech_options.csv': {  # 推测是 mod (人之领余烬[AoTD] - 问道圣殿) 2.X 版本的内容，但首次出现于TASC mod中
         'id_column_name': 'id',
-        'text_column_names': ['name', 'rewards']  # 对rewards列的翻译也许需要谨慎处理
+        'text_column_names': ['name', 'rewards', 'otherReq']  # 对rewards列的翻译也许需要谨慎处理
     },
     'data/campaign/terraforming/aotd_integration/terraforming_requirements_OR.csv': {  # 首次出现于TASC mod中，一些奇怪的提示信息
         'id_column_name': 'id',
@@ -97,6 +97,10 @@ const_refData = {
     'data/campaign/terraforming/planet_types.csv': {  # 首次出现于TASC mod，描述行星类型ID和数据
         'id_column_name': ['id', 'terraforming_type_id'],
         'text_column_names': ['name']
+    },
+    'data/campaign/terraforming/project_effects.csv': {  # 首次出现于TASC mod，描述行星类型ID和数据
+        'id_column_name': 'id',
+        'text_column_names': ['data']
     },
     'data/campaign/terraforming/terraforming_projects.csv': {  # 首次出现于TASC mod，项目名称和提示
         'id_column_name': 'id',

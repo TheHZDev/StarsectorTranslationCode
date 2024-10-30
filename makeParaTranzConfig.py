@@ -31,7 +31,7 @@ const_refData = {
     },
     'data/campaign/special_items.csv': {
         'id_column_name': 'id',
-        'text_column_names': ['name', 'desc']
+        'text_column_names': ['name', 'desc', 'tech/manufacturer']
     },
     'data/campaign/submarkets.csv': {
         'id_column_name': 'id',
@@ -98,7 +98,7 @@ const_refData = {
         'id_column_name': ['id', 'terraforming_type_id'],
         'text_column_names': ['name']
     },
-    'data/campaign/terraforming/project_effects.csv': {  # 首次出现于TASC mod，描述行星类型ID和数据
+    'data/campaign/terraforming/project_effects.csv': {  # 首次出现于TASC mod，描述地貌改造项目的影响（大部分都是代码）
         'id_column_name': 'id',
         'text_column_names': ['data']
     },

@@ -39,7 +39,7 @@ const_refData = {
     },
     'data/characters/skills/skill_data.csv': {
         'id_column_name': 'id',
-        'text_column_names': ['name', 'description']
+        'text_column_names': ['name', 'description', 'author']
     },
     # 'data/hullmods/hull_mods.csv': {
     #     'id_column_name': 'id',
@@ -122,6 +122,18 @@ const_refData = {
     'data/config/secondInCommand/SCSkills.csv': {  # 首次出现于 Second-In-Command mod 中，推测是技能数据
         'id_column_name': 'id',
         'text_column_names': ['name']
+    },
+    'data/campaign/aotd_faction_behaviour.csv': {  # 首次出现于 问道圣殿 2.4.11，推测是携带数据库的舰队交易时的对话文本
+        'id_column_name': 'factionId',
+        'text_column_names': ['initResponse', 'dialogSelectOptionName', 'dialogDismayOptionName', 'responseAfter']
+    },
+    'data/campaign/aotd_production_projects.csv': {  # 首次出现于 问道圣殿 2.4.11，推测是特殊性工程项目数据
+        'id_column_name': 'id',
+        'text_column_names': ['name', 'projectDescription', 'stageNames', 'progressString', 'highlights']
+    },
+    'data/campaign/aotd_research_project.csv': {  # 首次出现于 问道圣殿 2.4.11，推测是特殊研究性项目数据
+        'id_column_name': 'id',
+        'text_column_names': ['name', 'stageMap', 'projectDescription']
     },
     # '': {
     #     'id_column_name': '',

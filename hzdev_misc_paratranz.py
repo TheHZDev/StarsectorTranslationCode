@@ -431,9 +431,6 @@ class SubParatranz(ParatrazProject):
         self.ImportOneConfig(Register=RegisterEnum.path,
                              Path=['/data/config/starship_legends/factionConfigurations.json'],
                              FromOriginal=self.inFactionConfigurations, ToLocalization=self.outFactionConfigurations)
-        # 原版 - 联络人的相关分类属性
-        self.ImportOneConfig(Register=RegisterEnum.path, Path=['/data/config/contact_tag_data.json'],
-                             FromOriginal=self.inContactTagData, ToLocalization=self.outContactTagData)
         # 原版 - 舰船具体配置文件（231229：经向猫猫询问得知，该部分无需翻译）
         # self.ImportOneConfig(Register=folder_ext, Folder_Ext=[('/data/hulls/', 'ship')],
         #                      FromOriginal=self.inShipFile, ToLocalization=self.outShipFile)
@@ -465,6 +462,9 @@ class SubParatranz(ParatrazProject):
         # 前线秘闻mod - 该mod自行实现的一套类似"战斗骚话mod"的文本
         self.ImportOneConfig(Register=RegisterEnum.path, Path=['/data/config/sotf/sotf_officerConvos.json'],
                              FromOriginal=self.inSoTFOfficerConvos, ToLocalization=self.outSoTFOfficerConvos)
+        # 原版 - 联络人的分类属性 / 信息面板分类页签 的相关数据
+        self.ImportOneConfig(Register=RegisterEnum.path, Path=['/data/config/contact_tag_data.json', '/data/config/tag_data.json'],
+                             FromOriginal=self.inTagData, ToLocalization=self.outTagData)
 
     # data/missions/*
     def inMissions(self, *args):
@@ -872,19 +872,6 @@ class SubParatranz(ParatrazProject):
     def outFactionConfigurations(self, *args):
         self.__commonTranslateFunc_v2(*args)
 
-    # data/config/contact_tag_data.json
-    def inContactTagData(self, *args):
-        with open(args[0], encoding='UTF-8') as tFile:
-            tOriginal: Dict[str, dict] = json5.loads(self.__filterJSON5(tFile.read()))
-        result = []
-        for firstKey in tOriginal:
-            if 'name' in tOriginal[firstKey]:
-                result.append(self.__buildDict(f'{firstKey}#name', tOriginal[firstKey]['name']))
-        self.__writeParatranzJSON(result, args[1])
-
-    def outContactTagData(self, *args):
-        self.__commonTranslateFunc_v2(*args)
-
     # data/hulls/*.ship
     def inShipFile(self, *args):
         with open(args[0], encoding='UTF-8') as tFile:
@@ -1195,6 +1182,25 @@ class SubParatranz(ParatrazProject):
                 tOriginal[key]['lines'][int(numID)][1] = unit.translation
         with open(args[2], 'w', encoding='UTF-8') as tFile:
             json5.dump(tOriginal, tFile, indent=4, ensure_ascii=False)
+
+    # data/config/contact_tag_data.json 和 data/config/tag_data.json
+    def inTagData(self, *args):
+        with open(args[0], encoding='UTF-8') as tFile:
+            tOriginal: dict = json5.loads(self.__filterJSON5(tFile.read()))
+        result = []
+        if args[0].endswith('contact_tag_data.json'):
+            contextTextPrefix = '联络人的Tag的名称（比如 海盗/军方 那些）'
+        else:
+            contextTextPrefix = '信息面板分类页签的名称（比如 新消息）'
+        for unitKey in tOriginal:
+            descText = pprint.pformat({unitKey: tOriginal[unitKey]}, sort_dicts=False)
+            if 'name' in tOriginal[unitKey]:
+                result.append(self.__buildDict(f'{unitKey}#name', tOriginal[unitKey]['name'],
+                                                   f'{contextTextPrefix}\n\n[本行原始数据]\n{descText}'))
+        self.__writeParatranzJSON(result, args[1])
+
+    def outTagData(self, *args):
+        self.__commonTranslateFunc_v2(*args)
 
     @staticmethod
     def __filterJSON5(fileContent: str):

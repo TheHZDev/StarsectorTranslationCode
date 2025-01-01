@@ -1127,7 +1127,7 @@ class SubParatranz(ParatrazProject):
         with open(args[0], encoding='UTF-8') as tFile:
             t0 = tFile.read()
             for t2 in re.findall('"?scope\\d?"? *: *CUSTOM', t0):
-                t3 = t2.split(':').strip()
+                t3 = t2.split(':')[0].strip()
                 t0 = t0.replace(t2, t3 + ':"CUSTOM"')
             tOriginal: dict = json5.loads(self.__filterJSON5(t0))
         # 以上操作是为了过滤某些又不好好写文件的SB Modder

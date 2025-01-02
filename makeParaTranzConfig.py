@@ -31,7 +31,7 @@ const_refData = {
     },
     'data/campaign/special_items.csv': {
         'id_column_name': 'id',
-        'text_column_names': ['name', 'desc', 'tech/manufacturer']
+        'text_column_names': ['name', 'desc']
     },
     'data/campaign/submarkets.csv': {
         'id_column_name': 'id',
@@ -39,7 +39,7 @@ const_refData = {
     },
     'data/characters/skills/skill_data.csv': {
         'id_column_name': 'id',
-        'text_column_names': ['name', 'description', 'author']
+        'text_column_names': ['name', 'description']
     },
     # 'data/hullmods/hull_mods.csv': {
     #     'id_column_name': 'id',
@@ -84,7 +84,7 @@ const_refData = {
     },
     'data/campaign/aotd_tech_options.csv': {  # 推测是 mod (人之领余烬[AoTD] - 问道圣殿) 2.X 版本的内容，但首次出现于TASC mod中
         'id_column_name': 'id',
-        'text_column_names': ['name', 'rewards', 'otherReq']  # 对rewards列的翻译也许需要谨慎处理
+        'text_column_names': ['name', 'rewards']  # 对rewards列的翻译也许需要谨慎处理
     },
     'data/campaign/terraforming/aotd_integration/terraforming_requirements_OR.csv': {  # 首次出现于TASC mod中，一些奇怪的提示信息
         'id_column_name': 'id',
@@ -98,42 +98,33 @@ const_refData = {
         'id_column_name': ['id', 'terraforming_type_id'],
         'text_column_names': ['name']
     },
-    'data/campaign/terraforming/project_effects.csv': {  # 首次出现于TASC mod，描述地貌改造项目的影响（大部分都是代码）
-        'id_column_name': 'id',
-        'text_column_names': ['data']
-    },
     'data/campaign/terraforming/terraforming_projects.csv': {  # 首次出现于TASC mod，项目名称和提示
         'id_column_name': 'id',
-        'text_column_names': ['tooltip', 'tooltip_highlights', 'intel_complete_message', 'incomplete_message',
-                              'incomplete_message_highlights', 'disrupted_message', 'disrupted_message_highlights']
+        'text_column_names': ['tooltip', 'tooltip_highlights', 'intel_complete_message', 'incomplete_message', 'incomplete_message_highlights', 'disrupted_message', 'disrupted_message_highlights']
     },
     'data/campaign/terraforming/terraforming_requirements_OR.csv': {  # 首次出现于TASC mod
         'id_column_name': 'id',
         'text_column_names': ['tooltip', 'tooltip_highlights']
     },
-    'data/config/secondInCommand/SCAptitudes.csv': {  # 首次出现于 Second-In-Command mod 中，推测是主领域分类
+    'data/config/magic_achievements.csv': {  # 推测是MagicLib的成就系统的相关数据
+        'id_column_name': 'id',
+        'text_column_names': ['name', 'description', 'tooltip']
+    },
+    'data/config/secondInCommand/SCAptitudes.csv': {  # 首次出现于Second In Command mod中，副手的技能树名称
         'id_column_name': 'id',
         'text_column_names': ['name']
     },
-    'data/config/secondInCommand/SCCategories.csv': {  # 首次出现于 Second-In-Command mod 中，推测是子领域（Aptitude的下级）
+    'data/config/secondInCommand/SCSkills.csv': {  # 首次出现于Second In Command mod中，副手的技能树数据
         'id_column_name': 'id',
         'text_column_names': ['name']
     },
-    'data/config/secondInCommand/SCSkills.csv': {  # 首次出现于 Second-In-Command mod 中，推测是技能数据
-        'id_column_name': 'id',
-        'text_column_names': ['name']
+    'data/config/vayraBounties/unique_bounty_data.csv': {  # 推测是VaryaSector所提供的HVB框架文件
+        'id_column_name': 'bounty_id',
+        'text_column_names': ['fleetName', 'flagshipName', 'greetingText', 'intelText']
     },
-    'data/campaign/aotd_faction_behaviour.csv': {  # 首次出现于 问道圣殿 2.4.11，推测是携带数据库的舰队交易时的对话文本
-        'id_column_name': 'factionId',
-        'text_column_names': ['initResponse', 'dialogSelectOptionName', 'dialogDismayOptionName', 'responseAfter']
-    },
-    'data/campaign/aotd_production_projects.csv': {  # 首次出现于 问道圣殿 2.4.11，推测是特殊性工程项目数据
-        'id_column_name': 'id',
-        'text_column_names': ['name', 'projectDescription', 'stageNames', 'progressString', 'highlights']
-    },
-    'data/campaign/aotd_research_project.csv': {  # 首次出现于 问道圣殿 2.4.11，推测是特殊研究性项目数据
-        'id_column_name': 'id',
-        'text_column_names': ['name', 'stageMap', 'projectDescription']
+    'data/campaign/aotd_rank_data.csv': {  # 首次出现于 AoTD - Question of Loyalty 中，各种势力的雇佣数据
+        'id_column_name': 'rank_id',
+        'text_column_names': ['name', 'description']
     },
     # '': {
     #     'id_column_name': '',

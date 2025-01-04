@@ -160,6 +160,8 @@ class ParatrazProject:
                                                    missionTextTXT.replace(ORIGINAL_PATH, TRANSLATION_PATH))
 
     def __dealWithPath(self, filePath: str, funcID: bool = False):
+        if len(self.__pathProgram) == 0:
+            return
         # 路径处理器
         realFilePath = filePath.replace('/', sep)
         if not funcID:  # 翻译
@@ -179,6 +181,8 @@ class ParatrazProject:
                         break  # 广播拦截
 
     def __dealWithFolder(self, filePath: str, funcID: bool = False):
+        if len(self.__folderProgram) == 0:
+            return
         # 目录处理器
         realFilePath = filePath.replace('/', sep)
         folderPath = filePath.rpartition('/')[0]
@@ -199,7 +203,9 @@ class ParatrazProject:
                         break  # 广播拦截
 
     def __dealWithExt(self, filePath: str, funcID: bool = False):
-        # 扩展名处理器
+        if len(self.__extProgram) == 0:
+            return
+            # 扩展名处理器
         realFilePath = filePath.replace('/', sep)
         fileExt = filePath.rpartition('/')[2].rpartition('.')[2]
         if not funcID:  # 翻译
@@ -219,6 +225,8 @@ class ParatrazProject:
                         break  # 广播拦截
 
     def __dealWithFolderAndExt(self, filePath: str, funcID: bool = False):
+        if len(self.__folder_ext_Program) == 0:
+            return
         # 目录 + 扩展名 联合处理器
         realFilePath = filePath.replace('/', sep)
         fileExt = filePath.rpartition('/')[2].rpartition('.')[2]
@@ -226,22 +234,27 @@ class ParatrazProject:
         if not funcID:  # 翻译
             for program in self.__folder_ext_Program:
                 for tFolderPath, tExt in program.get('Folder_Ext'):
-                    if folderPath == tFolderPath and tExt.lower() == fileExt.lower():
-                        self.__makeDirs(PARA_TRANZ_PATH + realFilePath)
-                        self.__executeFunc(program.get('FromOriginal'), ORIGINAL_PATH + realFilePath,
-                                           self.__changeExt(PARA_TRANZ_PATH + realFilePath, 'json'))
-                        break
+                    if tExt.lower() == fileExt.lower():
+                        # 250104：为翻译装配文件的名称，因此允许额外扩展其子目录数据，但是需要特殊标志才会进行扩展
+                        if folderPath == tFolderPath or (program.get('ExtendSubFolder') and folderPath.startswith(tFolderPath)):
+                            self.__makeDirs(PARA_TRANZ_PATH + realFilePath)
+                            self.__executeFunc(program.get('FromOriginal'), ORIGINAL_PATH + realFilePath,
+                                               self.__changeExt(PARA_TRANZ_PATH + realFilePath, 'json'))
+                            break
         else:  # 写回
             for program in self.__folder_ext_Program:
                 for tFolderPath, tExt in program.get('Folder_Ext'):
-                    if folderPath == tFolderPath and tExt.lower() == fileExt.lower():
-                        self.__makeDirs(TRANSLATION_PATH + realFilePath)
-                        self.__executeFunc(program.get('ToLocalization'), ORIGINAL_PATH + realFilePath,
-                                           self.__changeExt(PARA_TRANZ_PATH + realFilePath, 'json'),
-                                           TRANSLATION_PATH + realFilePath)
-                        break
+                    if tExt.lower() == fileExt.lower():
+                        if folderPath == tFolderPath or (program.get('ExtendSubFolder') and folderPath.startswith(tFolderPath)):
+                            self.__makeDirs(TRANSLATION_PATH + realFilePath)
+                            self.__executeFunc(program.get('ToLocalization'), ORIGINAL_PATH + realFilePath,
+                                               self.__changeExt(PARA_TRANZ_PATH + realFilePath, 'json'),
+                                               TRANSLATION_PATH + realFilePath)
+                            break
 
     def __dealWithAll(self, filePath: str, funcID: bool = False):
+        if len(self.__allProgram) == 0:
+            return
         # 默认处理器，一般用不到
         realFilePath = filePath.replace('/', sep)
         if not funcID:  # 翻译
@@ -387,6 +400,7 @@ class SubParatranz(ParatrazProject):
                 thisConfig['Ext'] = kwargs.get('Ext')
             elif kwargs.get('Register') == RegisterEnum.folder_ext:
                 thisConfig['Folder_Ext'] = kwargs.get('Folder_Ext')
+                thisConfig['ExtendSubFolder'] = kwargs.get('ExtendSubFolder', False)  # 250104：扩展相对目录处理范围，使得该功能可以处理其子目录
             self.Config.append(thisConfig)
 
     def ImportConfig(self):
@@ -465,6 +479,9 @@ class SubParatranz(ParatrazProject):
         # 原版 - 联络人的分类属性 / 信息面板分类页签 的相关数据
         self.ImportOneConfig(Register=RegisterEnum.path, Path=['/data/config/contact_tag_data.json', '/data/config/tag_data.json'],
                              FromOriginal=self.inTagData, ToLocalization=self.outTagData)
+        # 原版 - 装配文件的显示名称
+        self.ImportOneConfig(Register=RegisterEnum.folder_ext, Folder_Ext=[('/data/variants/', 'variant')],
+                             FromOriginal=self.inVariant, ToLocalization=self.outVariant, ExtendSubFolder=True)
 
     # data/missions/*
     def inMissions(self, *args):
@@ -1201,6 +1218,19 @@ class SubParatranz(ParatrazProject):
 
     def outTagData(self, *args):
         self.__commonTranslateFunc_v2(*args)
+
+    # data/variants/*.variant
+    def inVariant(self, *args):
+        with open(args[0], encoding='UTF-8') as tFile:
+            tOriginal: dict = json5.loads(self.__filterJSON5(tFile.read()))
+        result = []
+        if 'displayName' in tOriginal:
+            result.append(self.__buildDict(f'root#displayName', tOriginal['displayName'],
+                                           f'[本文件原始数据]\n{pprint.pformat(tOriginal, sort_dicts=False)}'))
+        self.__writeParatranzJSON(result, args[1])
+
+    def outVariant(self, *args):
+        self.__commonTranslateFunc_v1(*args)
 
     @staticmethod
     def __filterJSON5(fileContent: str):

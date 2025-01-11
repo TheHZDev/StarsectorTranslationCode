@@ -122,6 +122,10 @@ const_refData = {
         'id_column_name': 'bounty_id',
         'text_column_names': ['fleetName', 'flagshipName', 'greetingText', 'intelText']
     },
+    'data/campaign/aotd_rank_data.csv': {  # 首次出现于 AoTD - Question of Loyalty 中，各种势力的雇佣数据
+        'id_column_name': 'rank_id',
+        'text_column_names': ['name', 'description']
+    },
     # '': {
     #     'id_column_name': '',
     #     'text_column_names': []

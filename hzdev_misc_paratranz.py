@@ -205,7 +205,7 @@ class ParatrazProject:
     def __dealWithExt(self, filePath: str, funcID: bool = False):
         if len(self.__extProgram) == 0:
             return
-            # 扩展名处理器
+        # 扩展名处理器
         realFilePath = filePath.replace('/', sep)
         fileExt = filePath.rpartition('/')[2].rpartition('.')[2]
         if not funcID:  # 翻译
@@ -559,7 +559,7 @@ class SubParatranz(ParatrazProject):
         hintDict = {'displayName': '势力短名称', 'displayNameWithArticle': '带冠词的势力短名称',
                     'displayNameLong': '势力的书面正式名称', 'displayNameLongWithArticle': '带冠词的势力的书面正式名称'}
         for strKey in ('displayName', 'displayNameWithArticle', 'displayNameLong', 'displayNameLongWithArticle',
-                       'displayNameIsOrAre'):
+                       'displayNameIsOrAre', 'personNamePrefix', 'entityNamePrefix'):
             if strKey in tFileContent:
                 result.append(self.__buildDict(f'root#{strKey}', tFileContent.get(strKey), hintDict.get(strKey)))
                 if strKey == 'displayNameIsOrAre':  # 240729：往刚刚增加的翻译文本里覆写默认数据
@@ -1224,7 +1224,7 @@ class SubParatranz(ParatrazProject):
         with open(args[0], encoding='UTF-8') as tFile:
             tOriginal: dict = json5.loads(self.__filterJSON5(tFile.read()))
         result = []
-        if 'displayName' in tOriginal:
+        if 'displayName' in tOriginal and tOriginal['displayName'] != '':
             result.append(self.__buildDict(f'root#displayName', tOriginal['displayName'],
                                            f'[本文件原始数据]\n{pprint.pformat(tOriginal, sort_dicts=False)}'))
         self.__writeParatranzJSON(result, args[1])

@@ -31,7 +31,7 @@ const_refData = {
     },
     'data/campaign/special_items.csv': {
         'id_column_name': 'id',
-        'text_column_names': ['name', 'desc']
+        'text_column_names': ['name', 'desc', 'tech/manufacturer']
     },
     'data/campaign/submarkets.csv': {
         'id_column_name': 'id',
@@ -121,10 +121,6 @@ const_refData = {
     'data/config/vayraBounties/unique_bounty_data.csv': {  # 推测是VaryaSector所提供的HVB框架文件
         'id_column_name': 'bounty_id',
         'text_column_names': ['fleetName', 'flagshipName', 'greetingText', 'intelText']
-    },
-    'data/campaign/aotd_rank_data.csv': {  # 首次出现于 AoTD - Question of Loyalty 中，各种势力的雇佣数据
-        'id_column_name': 'rank_id',
-        'text_column_names': ['name', 'description']
     },
     # '': {
     #     'id_column_name': '',

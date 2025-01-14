@@ -29,17 +29,17 @@ class SingleFileConfig(NamedTuple):
     @property
     def absoluteOriginalPath(self) -> str:
         """源文件的绝对路径。"""
-        return os.path.join(ORIGINAL_PATH, self.relativeFilePath)
+        return os.path.join(ORIGINAL_PATH, self.relativeFilePath.replace('/', os.sep))
 
     @property
     def absoluteLocalizationPath(self) -> str:
         """目标文件的绝对路径。"""
-        return os.path.join(TRANSLATION_PATH, self.relativeFilePath)
+        return os.path.join(TRANSLATION_PATH, self.relativeFilePath.replace('/', os.sep))
 
     @property
     def absoluteParatranzFilePath(self) -> str:
         """中间文件的绝对路径。"""
-        return os.path.join(PARA_TRANZ_PATH, self.relativeFilePath[:-4] + '.json')
+        return os.path.join(PARA_TRANZ_PATH, self.relativeFilePath.replace('/', os.sep)[:-4] + '.json')
 
     def makeFolders(self, *, folderLocalization: bool = False, folderParatranz: bool = False):
         """

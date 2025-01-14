@@ -1,20 +1,23 @@
-import pprint
-from os import sep, scandir, DirEntry
-from os.path import isfile, isdir
-from typing import List, Dict, Tuple, NamedTuple
-import re
 import csv
+import json
+import pprint
+import re
 from enum import Enum
 from hashlib import md5
+from os import sep, scandir, DirEntry
+from os.path import isfile, isdir
+from pathlib import Path
+from typing import List, Dict, Tuple, NamedTuple
 
-import json
 import json5
 
-from para_tranz_script import PARA_TRANZ_PATH, ORIGINAL_PATH, TRANSLATION_PATH
+from hzdev_csv_paratranz import csvSubParatranz
+from dataModel import ParatranzDataUnit
 
-PARA_TRANZ_PATH = str(PARA_TRANZ_PATH)
-ORIGINAL_PATH = str(ORIGINAL_PATH)
-TRANSLATION_PATH = str(TRANSLATION_PATH)
+PROJECT_DIRECTORY = Path(__file__).parent.parent
+ORIGINAL_PATH = str(PROJECT_DIRECTORY / 'original')
+TRANSLATION_PATH = str(PROJECT_DIRECTORY / 'localization')
+PARA_TRANZ_PATH = str(PROJECT_DIRECTORY / 'para_tranz' / 'output')
 
 
 class RegisterEnum(Enum):
@@ -102,9 +105,8 @@ class ParatrazProject:
 
     def Start(self):
         print('Paratranz 项目助手',
-              '1 - 从原始和汉化文件导出 ParaTranz 词条',
-              '2 - 将 ParaTranz 词条写回汉化文件(localization)',
-              '3 - 为 para_tranz_script.py 生成配置文件',
+              '1 - 从原始和汉化文件导出 Paratranz 词条',
+              '2 - 将 Paratranz 词条写回汉化文件(localization)',
               '其它任意键 - 退出',
               sep='\n')
         userSelect = input('请输入您的选择：').strip()
@@ -113,8 +115,11 @@ class ParatrazProject:
                 if self.__dealWithPath(originalFile) or self.__dealWithFolder(originalFile) or \
                         self.__dealWithExt(originalFile) or self.__dealWithFolderAndExt(originalFile) or \
                         self.__dealWithAll(originalFile):
+                    print(f'已从 {originalFile} 提取可翻译文本。')
                     continue
+                print(f'已略过：{originalFile}')
             self.__dealWithMission()
+            csvSubParatranz.OriginalToParatranz()
             print('翻译文件解析完毕。')
         elif userSelect == '2':
             for paratranzFile in self.__originalFilePaths:
@@ -123,13 +128,11 @@ class ParatrazProject:
                 if self.__dealWithPath(paratranzFile, True) or self.__dealWithFolder(paratranzFile, True) or \
                         self.__dealWithExt(paratranzFile, True) or self.__dealWithFolderAndExt(paratranzFile, True) or \
                         self.__dealWithAll(paratranzFile, True):
+                    print(f'已从 {paratranzFile} 整合了译文，并写回了对应文件。')
                     continue
             self.__dealWithMission(True)
+            csvSubParatranz.ParatranzToLocalization()
             print('译文文件解析完毕。')
-        elif userSelect == '3':
-            from makeParaTranzConfig import preStartConfirm, makeConfigFile
-
-            makeConfigFile(ORIGINAL_PATH, self.__originalFilePaths, **preStartConfirm())
 
     def __dealWithMission(self, funcID: bool = False):
         """战役系统处理器"""
@@ -161,7 +164,7 @@ class ParatrazProject:
 
     def __dealWithPath(self, filePath: str, funcID: bool = False):
         if len(self.__pathProgram) == 0:
-            return
+            return False
         # 路径处理器
         realFilePath = filePath.replace('/', sep)
         if not funcID:  # 翻译
@@ -179,10 +182,11 @@ class ParatrazProject:
                                           self.__changeExt(PARA_TRANZ_PATH + realFilePath, 'json'),
                                           TRANSLATION_PATH + realFilePath):
                         break  # 广播拦截
+        return True
 
     def __dealWithFolder(self, filePath: str, funcID: bool = False):
         if len(self.__folderProgram) == 0:
-            return
+            return False
         # 目录处理器
         realFilePath = filePath.replace('/', sep)
         folderPath = filePath.rpartition('/')[0]
@@ -201,10 +205,11 @@ class ParatrazProject:
                                           self.__changeExt(PARA_TRANZ_PATH + realFilePath, 'json'),
                                           TRANSLATION_PATH + realFilePath):
                         break  # 广播拦截
+        return True
 
     def __dealWithExt(self, filePath: str, funcID: bool = False):
         if len(self.__extProgram) == 0:
-            return
+            return False
         # 扩展名处理器
         realFilePath = filePath.replace('/', sep)
         fileExt = filePath.rpartition('/')[2].rpartition('.')[2]
@@ -223,10 +228,11 @@ class ParatrazProject:
                                           self.__changeExt(PARA_TRANZ_PATH + realFilePath, 'json'),
                                           TRANSLATION_PATH + realFilePath):
                         break  # 广播拦截
+        return True
 
     def __dealWithFolderAndExt(self, filePath: str, funcID: bool = False):
         if len(self.__folder_ext_Program) == 0:
-            return
+            return False
         # 目录 + 扩展名 联合处理器
         realFilePath = filePath.replace('/', sep)
         fileExt = filePath.rpartition('/')[2].rpartition('.')[2]
@@ -236,7 +242,8 @@ class ParatrazProject:
                 for tFolderPath, tExt in program.get('Folder_Ext'):
                     if tExt.lower() == fileExt.lower():
                         # 250104：为翻译装配文件的名称，因此允许额外扩展其子目录数据，但是需要特殊标志才会进行扩展
-                        if folderPath == tFolderPath or (program.get('ExtendSubFolder') and folderPath.startswith(tFolderPath)):
+                        if folderPath == tFolderPath or (
+                                program.get('ExtendSubFolder') and folderPath.startswith(tFolderPath)):
                             self.__makeDirs(PARA_TRANZ_PATH + realFilePath)
                             self.__executeFunc(program.get('FromOriginal'), ORIGINAL_PATH + realFilePath,
                                                self.__changeExt(PARA_TRANZ_PATH + realFilePath, 'json'))
@@ -245,16 +252,18 @@ class ParatrazProject:
             for program in self.__folder_ext_Program:
                 for tFolderPath, tExt in program.get('Folder_Ext'):
                     if tExt.lower() == fileExt.lower():
-                        if folderPath == tFolderPath or (program.get('ExtendSubFolder') and folderPath.startswith(tFolderPath)):
+                        if folderPath == tFolderPath or (
+                                program.get('ExtendSubFolder') and folderPath.startswith(tFolderPath)):
                             self.__makeDirs(TRANSLATION_PATH + realFilePath)
                             self.__executeFunc(program.get('ToLocalization'), ORIGINAL_PATH + realFilePath,
                                                self.__changeExt(PARA_TRANZ_PATH + realFilePath, 'json'),
                                                TRANSLATION_PATH + realFilePath)
                             break
+        return True
 
     def __dealWithAll(self, filePath: str, funcID: bool = False):
         if len(self.__allProgram) == 0:
-            return
+            return False
         # 默认处理器，一般用不到
         realFilePath = filePath.replace('/', sep)
         if not funcID:  # 翻译
@@ -270,6 +279,7 @@ class ParatrazProject:
                                       self.__changeExt(PARA_TRANZ_PATH + realFilePath, 'json'),
                                       TRANSLATION_PATH + realFilePath):
                     break  # 广播拦截
+        return True
 
     def __executeFunc(self, funcName: str, *args):
         if hasattr(self, funcName):
@@ -331,37 +341,6 @@ class QuotedSpecialData(NamedTuple):
         for unit in self.specialData:
             endContent = endContent.replace(unit[0], unit[1], 1)
         return endContent
-
-
-class ParatranzDataUnit:
-    key: str  # 词条的唯一ID
-    original: str  # 词条的原文（待翻译文本）
-    translation: str  # 词条的翻译
-    stage: int  # 词条当前的状态，默认是0，即待翻译
-    context: str  # 词条的上下文，比如词条的应用场景
-
-    def __init__(self, key: str, original: str, context: str = None, **kwargs):
-        """
-        描述一个Paratranz的词条属性数据。
-
-        :param key: 词条在Paratranz上显示的“键值”。
-        :param original: 词条的原文，待翻译文本。
-        :param context: 词条的上下文数据。
-        """
-        self.key = key
-        self.original = original
-        self.translation = kwargs.get('translation', '')
-        self.stage = kwargs.get('stage', 0)
-        self.context = context
-
-    def asDict(self):
-        return dict(key=self.key, original=self.original, translation=self.translation, stage=self.stage,
-                    context=self.context)
-
-    @property
-    def isTranslated(self):
-        """该词条是否被标记为已翻译、已检查（一校）或已审核？"""
-        return self.stage in (1, 3, 5)
 
 
 class SubParatranz(ParatrazProject):
@@ -477,7 +456,8 @@ class SubParatranz(ParatrazProject):
         self.ImportOneConfig(Register=RegisterEnum.path, Path=['/data/config/sotf/sotf_officerConvos.json'],
                              FromOriginal=self.inSoTFOfficerConvos, ToLocalization=self.outSoTFOfficerConvos)
         # 原版 - 联络人的分类属性 / 信息面板分类页签 的相关数据
-        self.ImportOneConfig(Register=RegisterEnum.path, Path=['/data/config/contact_tag_data.json', '/data/config/tag_data.json'],
+        self.ImportOneConfig(Register=RegisterEnum.path,
+                             Path=['/data/config/contact_tag_data.json', '/data/config/tag_data.json'],
                              FromOriginal=self.inTagData, ToLocalization=self.outTagData)
         # 原版 - 装配文件的显示名称
         self.ImportOneConfig(Register=RegisterEnum.folder_ext, Folder_Ext=[('/data/variants/', 'variant')],
@@ -1151,12 +1131,14 @@ class SubParatranz(ParatrazProject):
         result = []
         for unitKey in tOriginal.keys():
             if re.fullmatch('^scopeStr\\d*$', unitKey) is not None:
-                result.append(self.__buildDict(f'root#{unitKey}', tOriginal[unitKey], f'技能的适用范围\n\n[本行原始数据]\n{pprint.pformat(tOriginal, sort_dicts=False)}'))
+                result.append(self.__buildDict(f'root#{unitKey}', tOriginal[unitKey],
+                                               f'技能的适用范围\n\n[本行原始数据]\n{pprint.pformat(tOriginal, sort_dicts=False)}'))
         if 'effectGroups' in tOriginal:
             for skillSubUnitID in range(len(tOriginal['effectGroups'])):
                 skillSubUnit = tOriginal['effectGroups'][skillSubUnitID]
                 if 'name' in skillSubUnit:
-                    result.append(self.__buildDict(f'effectGroups#{skillSubUnitID}$name', skillSubUnit['name'], f'技能的等级名称\n\n[本行原始数据]\n{pprint.pformat(skillSubUnit, sort_dicts=False)}'))
+                    result.append(self.__buildDict(f'effectGroups#{skillSubUnitID}$name', skillSubUnit['name'],
+                                                   f'技能的等级名称\n\n[本行原始数据]\n{pprint.pformat(skillSubUnit, sort_dicts=False)}'))
         self.__writeParatranzJSON(result, args[1])
 
     def outSkill(self, *args):
@@ -1213,7 +1195,7 @@ class SubParatranz(ParatrazProject):
             descText = pprint.pformat({unitKey: tOriginal[unitKey]}, sort_dicts=False)
             if 'name' in tOriginal[unitKey]:
                 result.append(self.__buildDict(f'{unitKey}#name', tOriginal[unitKey]['name'],
-                                                   f'{contextTextPrefix}\n\n[本行原始数据]\n{descText}'))
+                                               f'{contextTextPrefix}\n\n[本行原始数据]\n{descText}'))
         self.__writeParatranzJSON(result, args[1])
 
     def outTagData(self, *args):

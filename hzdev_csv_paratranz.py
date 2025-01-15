@@ -227,7 +227,7 @@ class csvSubParatranz:
             keyIndexCache[preRowID] = csvLineNum
         # 遍历Paratranz数据
         for paratranzUnit in tParatranz:
-            if paratranzUnit.isTranslated:
+            if paratranzUnit.isTranslated and paratranzUnit.translation != '':
                 rowNum = keyIndexCache.get(paratranzUnit.key.rpartition('$')[0])
                 if rowNum is None:
                     continue

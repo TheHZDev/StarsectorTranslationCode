@@ -462,6 +462,9 @@ class SubParatranz(ParatrazProject):
         # 原版 - 装配文件的显示名称
         self.ImportOneConfig(Register=RegisterEnum.folder_ext, Folder_Ext=[('/data/variants/', 'variant')],
                              FromOriginal=self.inVariant, ToLocalization=self.outVariant, ExtendSubFolder=True)
+        # 星际领主mod - 领主的部分描述数据
+        self.ImportOneConfig(Register=RegisterEnum.path, Path=['/data/lords/lords.json'],
+                             FromOriginal=self.inLords, ToLocalization=self.outLords)
 
     # data/missions/*
     def inMissions(self, *args):
@@ -1213,6 +1216,27 @@ class SubParatranz(ParatrazProject):
 
     def outVariant(self, *args):
         self.__commonTranslateFunc_v1(*args)
+
+    # data/lords/lords.json
+    def inLords(self, *args):
+        with open(args[0], encoding='UTF-8') as tFile:
+            tOriginal: dict = json.load(tFile)
+        result = []
+        hintDict = {
+            'lore': '对这名领主的描述',
+            'fleetName': '领主的舰队的名称'
+        }
+        for lordName in tOriginal:
+            lordData = tOriginal[lordName]
+            descText = pprint.pformat(lordData, sort_dicts=False)
+            for realKey in hintDict:
+                if realKey in lordData:
+                    result.append(self.__buildDict(f'{lordName}#{realKey}', lordData[realKey],
+                                                   f'{hintDict[realKey]}\n\n[本行原始数据]\n{descText}'))
+        self.__writeParatranzJSON(result, args[1])
+
+    def outLords(self, *args):
+        self.__commonTranslateFunc_v2(*args)
 
     @staticmethod
     def __filterJSON5(fileContent: str):

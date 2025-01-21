@@ -173,7 +173,7 @@ class ParatrazProject:
                     self.__makeDirs(PARA_TRANZ_PATH + realFilePath)
                     if self.__executeFunc(program.get('FromOriginal'), ORIGINAL_PATH + realFilePath,
                                           self.__changeExt(PARA_TRANZ_PATH + realFilePath, 'json')):
-                        break  # 广播拦截
+                        return True # 广播拦截
         else:  # 写回
             for program in self.__pathProgram:
                 if filePath in program.get('Path'):
@@ -181,8 +181,8 @@ class ParatrazProject:
                     if self.__executeFunc(program.get('ToLocalization'), ORIGINAL_PATH + realFilePath,
                                           self.__changeExt(PARA_TRANZ_PATH + realFilePath, 'json'),
                                           TRANSLATION_PATH + realFilePath):
-                        break  # 广播拦截
-        return True
+                        return True  # 广播拦截
+        return False
 
     def __dealWithFolder(self, filePath: str, funcID: bool = False):
         if len(self.__folderProgram) == 0:
@@ -196,7 +196,7 @@ class ParatrazProject:
                     self.__makeDirs(PARA_TRANZ_PATH + realFilePath)
                     if self.__executeFunc(program.get('FromOriginal'), ORIGINAL_PATH + realFilePath,
                                           self.__changeExt(PARA_TRANZ_PATH + realFilePath, 'json')):
-                        break  # 广播拦截
+                        return True  # 广播拦截
         else:  # 写回
             for program in self.__folderProgram:
                 if folderPath in program.get('Folder') or f'{folderPath}/' in program.get('Folder'):
@@ -204,8 +204,8 @@ class ParatrazProject:
                     if self.__executeFunc(program.get('ToLocalization'), ORIGINAL_PATH + realFilePath,
                                           self.__changeExt(PARA_TRANZ_PATH + realFilePath, 'json'),
                                           TRANSLATION_PATH + realFilePath):
-                        break  # 广播拦截
-        return True
+                        return True  # 广播拦截
+        return False
 
     def __dealWithExt(self, filePath: str, funcID: bool = False):
         if len(self.__extProgram) == 0:
@@ -219,7 +219,7 @@ class ParatrazProject:
                     self.__makeDirs(PARA_TRANZ_PATH + realFilePath)
                     if self.__executeFunc(program.get('FromOriginal'), ORIGINAL_PATH + realFilePath,
                                           self.__changeExt(PARA_TRANZ_PATH + realFilePath, 'json')):
-                        break  # 广播拦截
+                        return True  # 广播拦截
         else:  # 写回
             for program in self.__extProgram:
                 if fileExt.lower() in program.get('Ext'):
@@ -227,8 +227,8 @@ class ParatrazProject:
                     if self.__executeFunc(program.get('ToLocalization'), ORIGINAL_PATH + realFilePath,
                                           self.__changeExt(PARA_TRANZ_PATH + realFilePath, 'json'),
                                           TRANSLATION_PATH + realFilePath):
-                        break  # 广播拦截
-        return True
+                        return True  # 广播拦截
+        return False
 
     def __dealWithFolderAndExt(self, filePath: str, funcID: bool = False):
         if len(self.__folder_ext_Program) == 0:
@@ -247,7 +247,7 @@ class ParatrazProject:
                             self.__makeDirs(PARA_TRANZ_PATH + realFilePath)
                             self.__executeFunc(program.get('FromOriginal'), ORIGINAL_PATH + realFilePath,
                                                self.__changeExt(PARA_TRANZ_PATH + realFilePath, 'json'))
-                            break
+                            return True
         else:  # 写回
             for program in self.__folder_ext_Program:
                 for tFolderPath, tExt in program.get('Folder_Ext'):
@@ -258,8 +258,8 @@ class ParatrazProject:
                             self.__executeFunc(program.get('ToLocalization'), ORIGINAL_PATH + realFilePath,
                                                self.__changeExt(PARA_TRANZ_PATH + realFilePath, 'json'),
                                                TRANSLATION_PATH + realFilePath)
-                            break
-        return True
+                            return True
+        return False
 
     def __dealWithAll(self, filePath: str, funcID: bool = False):
         if len(self.__allProgram) == 0:
@@ -271,15 +271,15 @@ class ParatrazProject:
                 self.__makeDirs(PARA_TRANZ_PATH + realFilePath)
                 if self.__executeFunc(program.get('FromOriginal'), ORIGINAL_PATH + realFilePath,
                                       self.__changeExt(PARA_TRANZ_PATH + realFilePath, 'json')):
-                    break  # 广播拦截
+                    return True  # 广播拦截
         else:  # 写回
             for program in self.__allProgram:
                 self.__makeDirs(TRANSLATION_PATH + realFilePath)
                 if self.__executeFunc(program.get('ToLocalization'), ORIGINAL_PATH + realFilePath,
                                       self.__changeExt(PARA_TRANZ_PATH + realFilePath, 'json'),
                                       TRANSLATION_PATH + realFilePath):
-                    break  # 广播拦截
-        return True
+                    return True  # 广播拦截
+        return False
 
     def __executeFunc(self, funcName: str, *args):
         if hasattr(self, funcName):

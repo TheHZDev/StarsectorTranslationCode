@@ -286,7 +286,8 @@ class ParatrazProject:
             callback_func = getattr(self, funcName)
             if callable(callback_func):
                 # try:
-                return callback_func(*args)
+                callback_func(*args)
+                return True
             # except:
             #     return False
 

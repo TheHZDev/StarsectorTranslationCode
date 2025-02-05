@@ -75,7 +75,7 @@ class csvSubParatranz:
             SingleFileConfig('data/hullmods/hull_mods.csv', 'id',
                              ['name', 'tech/manufacturer', 'uiTags', 'desc', 'short', 'sModDesc']),
             SingleFileConfig('data/strings/descriptions.csv', ('id', 'type'),
-                             ['id', 'type', 'text1', 'text2', 'text3', 'text4']),
+                             ['text1', 'text2', 'text3', 'text4']),
             SingleFileConfig('data/shipsystems/ship_systems.csv', 'id', ['name']),
             SingleFileConfig('data/weapons/weapon_data.csv', 'id',
                              ['name', 'tech/manufacturer', 'primaryRoleStr', 'speedStr', 'trackingStr', 'turnRateStr',
@@ -90,7 +90,7 @@ class csvSubParatranz:
             SingleFileConfig('data/campaign/frontiers/rat_frontiers_facilities.csv', 'id', ['name', 'shortDesc']),
             SingleFileConfig('data/campaign/frontiers/rat_frontiers_modifers.csv', 'id', ['name', 'desc']),
             # 首次出现于势力争霸mod的0.11.1里，角色背景
-            SingleFileConfig('data/config/exerelin/character_backgrounds.csv', 'id', ['name', 'shortDescription']),
+            SingleFileConfig('data/config/exerelin/character_backgrounds.csv', 'id', ['name', 'shortDescription', 'longDescription']),
             # 推测是 mod (人之领余烬[AoTD] - 问道圣殿) 2.X 版本的内容，但首次出现于TASC mod中
             SingleFileConfig('data/campaign/aotd_tech_options.csv', 'id', ['name', 'rewards']),
             # 首次出现于TASC mod中，一些奇怪的提示信息

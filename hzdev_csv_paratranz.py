@@ -69,7 +69,7 @@ class csvSubParatranz:
             SingleFileConfig('data/campaign/rules.csv', 'id', ['script', 'text', 'options']),
             SingleFileConfig('data/campaign/special_items.csv', 'id', ['name', 'desc', 'tech/manufacturer']),
             SingleFileConfig('data/campaign/submarkets.csv', 'id', ['name', 'desc']),
-            SingleFileConfig('data/characters/skills/skill_data.csv', 'id', ['name', 'description']),
+            SingleFileConfig('data/characters/skills/skill_data.csv', 'id', ['name', 'description', 'author']),
             SingleFileConfig('data/hulls/ship_data.csv', 'id', ['name', 'designation', 'tech/manufacturer']),
             SingleFileConfig('data/hulls/wing_data.csv', 'id', ['role desc']),
             SingleFileConfig('data/hullmods/hull_mods.csv', 'id',
@@ -85,8 +85,9 @@ class csvSubParatranz:
             SingleFileConfig('data/campaign/pets.csv', 'id', ['name', 'desc', 'natural_death']),
             # 首次出现于mod (AoTD - 尘世浮生)
             SingleFileConfig('data/campaign/aotd_colony_events.csv', 'eventId', ['name', 'options']),
-            # 首次出现于 RAT mod中
+            # 首次出现于 RandomAssortmentOfThings（Lukas的随手之作） mod中，舰队遗物数据
             SingleFileConfig('data/campaign/rat_artifacts.csv', 'id', ['name']),
+            # 首次出现于 RAT mod中，前哨站的设施及修正数据
             SingleFileConfig('data/campaign/frontiers/rat_frontiers_facilities.csv', 'id', ['name', 'shortDesc']),
             SingleFileConfig('data/campaign/frontiers/rat_frontiers_modifers.csv', 'id', ['name', 'desc']),
             # 首次出现于势力争霸mod的0.11.1里，角色背景

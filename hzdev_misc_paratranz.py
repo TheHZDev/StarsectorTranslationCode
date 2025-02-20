@@ -156,6 +156,7 @@ class ParatrazProject:
                             self.__executeFunc(self.__missionProgram.get('FromMission'), descriptorJSON, missionTextTXT,
                                                paratranzFileName)
                         else:
+                            self.__makeDirs(descriptorJSON.replace(ORIGINAL_PATH, TRANSLATION_PATH))
                             if isfile(paratranzFileName):
                                 self.__executeFunc(self.__missionProgram.get('ToMission'), descriptorJSON,
                                                    missionTextTXT, paratranzFileName,

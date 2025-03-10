@@ -1363,7 +1363,9 @@ class SubParatranz(ParatrazProject):
 
         for unit in self.__readParatranzJSON(args[1]):
             if unit.isTranslated:
-                checkExistAndReplace(unit.key.split('#', layerNum), 0, self.__getTranslation(unit),
+                # 修复一层JSON识别不出来的问题（这是由于特有写法导致的）
+                cacheLayerData = unit.key.split('#', layerNum) if layerNum > 1 else [unit.key.split('#', 1)[1]]
+                checkExistAndReplace(cacheLayerData, 0, self.__getTranslation(unit),
                                      tOriginal)
         with open(args[2], 'w', encoding='UTF-8') as tFile:
             json5.dump(tOriginal, tFile, ensure_ascii=False, indent=4, quote_keys=True)

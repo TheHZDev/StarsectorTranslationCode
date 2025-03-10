@@ -467,6 +467,9 @@ class SubParatranz(ParatrazProject):
         # 星际领主mod - 领主的部分描述数据
         self.ImportOneConfig(Register=RegisterEnum.path, Path=['/data/lords/lords.json'],
                              FromOriginal=self.inLords, ToLocalization=self.outLords)
+        # 势力争霸mod - 地面战争中各种能力、地形、军团的名称/影响文本
+        self.ImportOneConfig(Register=RegisterEnum.path, Path=['/data/config/exerelin/groundBattleDefs.json'],
+                             FromOriginal=self.inGroundBattleDefs, ToLocalization=self.outGroundBattleDefs)
 
     # data/missions/*
     def inMissions(self, *args):
@@ -1240,6 +1243,34 @@ class SubParatranz(ParatrazProject):
     def outLords(self, *args):
         self.__commonTranslateFunc_v2(*args)
 
+    # data/config/exerelin/groundBattleDefs.json
+    def inGroundBattleDefs(self, *args):
+        with open(args[0], encoding='UTF-8') as tFile:
+            tOriginal: dict = json5.loads(self.__filterJSON5(tFile.read()))
+        result = []
+        if 'conditions' in tOriginal:
+            for conditionID in tOriginal['conditions']:
+                tData: dict = tOriginal['conditions'][conditionID]
+                result.append(self.__buildDict(
+                    f'condition#{conditionID}#desc', tData['desc'],
+                    f'ID为[{conditionID}]的地貌特征对地面战争的影响\n[本行原始数据]\n{pprint.pformat(tData, sort_dicts=False)}'))
+        if 'abilities' in tOriginal:
+            for abilitiesID in tOriginal['abilities']:
+                tData: dict = tOriginal['abilities'][abilitiesID]
+                result.append(self.__buildDict(
+                    f'abilities#{abilitiesID}#name', tData['name'],
+                    f'地面战争中可使用的能力的名称\n[本行原始数据]\n{pprint.pformat(tData, sort_dicts=False)}'))
+        if 'unitTypes' in tOriginal:
+            for unitTypesID in tOriginal['unitTypes']:
+                tData: dict = tOriginal['unitTypes'][unitTypesID]
+                result.append(self.__buildDict(
+                    f'unitTypes#{unitTypesID}#name', tData['name'],
+                    f'地面战争的军队的名称\n[本行原始数据]\n{pprint.pformat(tData, sort_dicts=False)}'))
+        self.__writeParatranzJSON(result, args[1])
+
+    def outGroundBattleDefs(self, *args):
+        self.__commonTranslateFunc_vAny(3, *args)
+
     @staticmethod
     def __filterJSON5(fileContent: str):
         fileContent = fileContent.strip()
@@ -1297,27 +1328,46 @@ class SubParatranz(ParatrazProject):
 
     def __commonTranslateFunc_v1(self, *args):
         """提供一些只有一层json的翻译函数。"""
-        with open(args[0], encoding='UTF-8') as tFile:
-            tOriginal: dict = json5.loads(self.__filterJSON5(tFile.read()))
-        for unit in self.__readParatranzJSON(args[1]):
-            if unit.isTranslated:
-                keyStr = unit.key.split('#')[1]
-                if keyStr in tOriginal:
-                    tOriginal[keyStr] = self.__getTranslation(unit)
-        with open(args[2], 'w', encoding='UTF-8') as tFile:
-            json5.dump(tOriginal, tFile, ensure_ascii=False, indent=4, quote_keys=True)
+        self.__commonTranslateFunc_vAny(1, *args)
 
     def __commonTranslateFunc_v2(self, *args):
         """2层json时使用。"""
+        self.__commonTranslateFunc_vAny(2, *args)
+
+    def __commonTranslateFunc_vAny(self, layerNum: int, *args):
+        """
+        给指定层数的任意通常JSON使用。
+
+        :param layerNum: 指定最大层数。
+        """
+        if layerNum < 1:
+            return
         with open(args[0], encoding='UTF-8') as tFile:
             tOriginal: Dict[str, dict] = json5.loads(self.__filterJSON5(tFile.read()))
+
+        # 递归检查层级，适用于多种复合情况
+        def checkExistAndReplace(layerData: list, layerIndex: int, translationStr: str, originalData: dict):
+            """
+            检查原始数据中是否存在指定索引，索引为最后一位时替换，否则继续递归。
+
+            :param layerData: 索引数据，逐层往下寻找可能的数据。每层数据都应当是字典类型。
+            :param layerIndex: 索引序号，递归时自动+1。
+            :param translationStr: 要替换的翻译字符串。
+            :param originalData: 原始字典数据，递归时自动剥去一层。
+            """
+            if layerData[layerIndex] in originalData:
+                if layerIndex == len(layerData) - 1:
+                    originalData[layerData[layerIndex]] = translationStr
+                else: # 层层递归
+                    checkExistAndReplace(layerData, layerIndex + 1, translationStr, originalData[layerData[layerIndex]])
+
         for unit in self.__readParatranzJSON(args[1]):
             if unit.isTranslated:
-                firstKey, secondKey = unit.key.split('#')
-                if firstKey in tOriginal and secondKey in tOriginal[firstKey]:
-                    tOriginal[firstKey][secondKey] = self.__getTranslation(unit)
+                checkExistAndReplace(unit.key.split('#', layerNum), 0, self.__getTranslation(unit),
+                                     tOriginal)
         with open(args[2], 'w', encoding='UTF-8') as tFile:
             json5.dump(tOriginal, tFile, ensure_ascii=False, indent=4, quote_keys=True)
+
 
     @staticmethod
     def __extractDuplicateKeyText(toExtractDataList: List[dict], keyStr: str) -> Dict[str, int]:

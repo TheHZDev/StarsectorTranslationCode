@@ -470,6 +470,9 @@ class SubParatranz(ParatrazProject):
         # 势力争霸mod - 地面战争中各种能力、地形、军团的名称/影响文本
         self.ImportOneConfig(Register=RegisterEnum.path, Path=['/data/config/exerelin/groundBattleDefs.json'],
                              FromOriginal=self.inGroundBattleDefs, ToLocalization=self.outGroundBattleDefs)
+        # 势力争霸mod - 雇佣兵的名称及描述数据
+        self.ImportOneConfig(Register=RegisterEnum.path, Path=['/data/config/exerelin/mercConfig.json'],
+                             FromOriginal=self.inMercenaryConfig, ToLocalization=self.outMercenaryConfig)
 
     # data/missions/*
     def inMissions(self, *args):
@@ -1271,6 +1274,26 @@ class SubParatranz(ParatrazProject):
     def outGroundBattleDefs(self, *args):
         self.__commonTranslateFunc_vAny(3, *args)
 
+    # data/config/exerelin/mercConfig.json
+    def inMercenaryConfig(self, *args):
+        with open(args[0], encoding='UTF-8') as tFile:
+            tOriginal: dict = json5.loads(self.__filterJSON5(tFile.read()))
+        result = []
+        if 'companies' in tOriginal:
+            for firstID in tOriginal['companies']:
+                lineData: dict = tOriginal['companies'][firstID]
+                descText = pprint.pformat(lineData, sort_dicts=False)
+                if 'name' in lineData:
+                    result.append(self.__buildDict(f'companies#{firstID}#name', lineData['name'],
+                                                   f'雇佣兵的名称\n[本行原始数据]\n{descText}'))
+                if 'desc' in lineData:
+                    result.append(self.__buildDict(f'companies#{firstID}#desc', lineData['desc'],
+                                                   f'雇佣兵的描述\n[本行原始数据]\n{descText}'))
+        self.__writeParatranzJSON(result, args[1])
+
+    def outMercenaryConfig(self, *args):
+        self.__commonTranslateFunc_vAny(3, *args)
+
     @staticmethod
     def __filterJSON5(fileContent: str):
         fileContent = fileContent.strip()
@@ -1342,6 +1365,7 @@ class SubParatranz(ParatrazProject):
         """
         if layerNum < 1:
             return
+        layerNum = max(1, layerNum - 1)
         with open(args[0], encoding='UTF-8') as tFile:
             tOriginal: Dict[str, dict] = json5.loads(self.__filterJSON5(tFile.read()))
 

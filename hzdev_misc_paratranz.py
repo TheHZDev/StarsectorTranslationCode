@@ -453,7 +453,7 @@ class SubParatranz(ParatrazProject):
                              FromOriginal=self.inSettings, ToLocalization=self.outSettings)
         # 原版 - 技能详细数据（*.skill）的部分待翻译数据
         self.ImportOneConfig(Register=RegisterEnum.folder_ext, Folder_Ext=[('/data/characters/skills/', 'skill')],
-                             FromOriginal=self.inSkill, ToLocalization=self.inSkill)
+                             FromOriginal=self.inSkill, ToLocalization=self.outSkill)
         # 前线秘闻mod - 该mod自行实现的一套类似"战斗骚话mod"的文本
         self.ImportOneConfig(Register=RegisterEnum.path, Path=['/data/config/sotf/sotf_officerConvos.json'],
                              FromOriginal=self.inSoTFOfficerConvos, ToLocalization=self.outSoTFOfficerConvos)

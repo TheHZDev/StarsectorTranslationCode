@@ -1365,7 +1365,6 @@ class SubParatranz(ParatrazProject):
         """
         if layerNum < 1:
             return
-        layerNum = max(1, layerNum - 1)
         with open(args[0], encoding='UTF-8') as tFile:
             tOriginal: Dict[str, dict] = json5.loads(self.__filterJSON5(tFile.read()))
 
@@ -1388,7 +1387,7 @@ class SubParatranz(ParatrazProject):
         for unit in self.__readParatranzJSON(args[1]):
             if unit.isTranslated:
                 # 修复一层JSON识别不出来的问题（这是由于特有写法导致的）
-                cacheLayerData = unit.key.split('#', layerNum) if layerNum > 1 else [unit.key.split('#', 1)[1]]
+                cacheLayerData = unit.key.split('#', max(1, layerNum - 1)) if layerNum > 1 else [unit.key.split('#', 1)[1]]
                 checkExistAndReplace(cacheLayerData, 0, self.__getTranslation(unit),
                                      tOriginal)
         with open(args[2], 'w', encoding='UTF-8') as tFile:

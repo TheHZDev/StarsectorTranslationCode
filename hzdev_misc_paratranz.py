@@ -1400,6 +1400,9 @@ class SubParatranz(ParatrazProject):
         result = {}
         tVar = set()
         for unit in toExtractDataList:
+            # 250402：修复错误的文本格式引起报错的bug
+            if None in unit:
+                unit.pop(None)
             if [x.strip().startswith('#') for x in unit.values()].count(True) > 0:
                 continue  # 检测到任意文本以注释符`#`开头，判定该行可能是注释，予以排除
             if keyStr in unit and unit[keyStr].strip() != '':

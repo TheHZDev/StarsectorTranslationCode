@@ -8,11 +8,7 @@ inputProjectID = 3489  # 远行星号本体汉化项目的ID
 outputProjectID = []  # 其他需要依赖借鉴的远行星号mod项目的ID
 threadPool = ThreadPoolExecutor(max_workers=1)
 
-HTTP_Header = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:120.0) Gecko/20100101 Firefox/120.0',
-    'Authorization': API_Tokens,
-    'Accept': 'application/json, text/plain, */*'
-}
+HTTP_Header = {'Authorization': API_Tokens}
 
 tInput = requests.get(rwAPI.format(inputProjectID), headers=HTTP_Header,
                       params={'page': '1', 'pageSize': '114514'}).json()

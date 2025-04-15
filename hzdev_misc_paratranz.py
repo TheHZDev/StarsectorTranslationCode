@@ -806,8 +806,7 @@ class SubParatranz(ParatrazProject):
                     'job_intel_success': '赏金完成后，玩家在网络信息面板上看到的消息文本。',
                     'job_intel_failure': '赏金舰队被非玩家摧毁后，玩家在网络信息面板上看到的消息文本。',
                     'fleet_name': '赏金目标的舰队名称', 'fleet_flagship_name': '赏金目标的座舰的名称',
-                    'job_intel_expired': '赏金超期而未被完成，玩家在网络信息面板上看到的消息文本。',
-                    'job_difficultyDescription': '赏金的难度描述文本（推测）。'}
+                    'job_intel_expired': '赏金超期而未被完成，玩家在网络信息面板上看到的消息文本。'}
         for bountyID in tOriginal:
             for paraName in hintDict.keys():
                 if paraName in tOriginal[bountyID]:

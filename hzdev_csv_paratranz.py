@@ -75,7 +75,7 @@ class csvSubParatranz:
             SingleFileConfig('data/hullmods/hull_mods.csv', 'id',
                              ['name', 'tech/manufacturer', 'uiTags', 'desc', 'short', 'sModDesc']),
             SingleFileConfig('data/strings/descriptions.csv', ('id', 'type'),
-                             ['text1', 'text2', 'text3', 'text4']),
+                             ['text1', 'text2', 'text3', 'text4', 'text5']),
             SingleFileConfig('data/shipsystems/ship_systems.csv', 'id', ['name']),
             SingleFileConfig('data/weapons/weapon_data.csv', 'id',
                              ['name', 'tech/manufacturer', 'primaryRoleStr', 'speedStr', 'trackingStr', 'turnRateStr',

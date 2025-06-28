@@ -118,6 +118,8 @@ class csvSubParatranz:
                              ['fleetName', 'flagshipName', 'greetingText', 'intelText']),
             # 首次出现于 AoTD - Question of Loyalty 中，各种势力的雇佣数据
             SingleFileConfig('data/campaign/aotd_rank_data.csv', 'rank_id', ['name', 'description']),
+            # 首次出现于SirHartley的Kaleidoscope mod中，推测应该是他自己的配置文件
+            SingleFileConfig('data/config/planet_texture_data.csv', 'id', ['type_name']),
         ]
 
     @classmethod

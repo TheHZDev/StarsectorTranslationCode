@@ -186,7 +186,7 @@ def mainFunc(**kwargs):
         if len(noHighlightTexts) == 0:  # 这说明整个文段都是高亮，不需要特别进行高亮处理
             switchCodes += [
                 f'{makeBigBackspace(3)}case "{ruleID}":',
-                f'{makeBigBackspace(4)}textPanel.addPara(getString({ruleID}), {highlightColor});',
+                f'{makeBigBackspace(4)}textPanel.addPara(getString("{ruleID}"), {highlightColor});',
                 f'{makeBigBackspace(4)}break;'
             ]
             stringsData[f'{javaClassName}_{ruleID}'] = ruleText
@@ -201,7 +201,8 @@ def mainFunc(**kwargs):
                 t2 = noHighlightTexts[t3].strip()
                 if len(t2.splitlines()) > 1:  # 高亮文本内强制分段
                     for t5 in t2.splitlines():
-                        highlightTextCode.append(t5)
+                        if len(t5) > 0:  # 避免添加无意义换行符
+                            highlightTextCode.append(t5)
                         # stringsData[f'{javaClassName}_{ruleID}_highlight_{hightlightID}'] = t5
                         # highlightTextCode.append(f'getString({ruleID}, {hightlightID})')
                         # hightlightID += 1
@@ -214,7 +215,7 @@ def mainFunc(**kwargs):
             stringsData[f'{javaClassName}_{ruleID}_highlights'] = ' || '.join(highlightTextCode)
             switchCodes += [
                 f'{makeBigBackspace(3)}case "{ruleID}":',
-                f'{makeBigBackspace(4)}textPanel.addPara(getString({ruleID}), {highlightColor}, textColor, getHighlightsString({ruleID}));',
+                f'{makeBigBackspace(4)}textPanel.addPara(getString("{ruleID}"), {highlightColor}, textColor, getHighlightsString("{ruleID}"));',
                 f'{makeBigBackspace(4)}break;'
             ]
         scriptsText.append(javaClassName)

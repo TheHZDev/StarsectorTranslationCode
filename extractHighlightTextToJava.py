@@ -2,6 +2,7 @@ import csv
 import json
 import hashlib
 import shlex
+import re
 import time
 from os import sep as os_sep
 import os.path
@@ -73,7 +74,7 @@ def printFileTail(**kwargs):
         # f'{makeBigBackspace(2)}return replaceToken(globalSetting.getString("{category}", String.format("{javaClassName}_%d_highlight_%d", ID, highlightID)));',
         # f'{makeBigBackspace()}}}',
         f'{makeBigBackspace()}private String[] getHighlightsString(String ID){{',
-        f'String t1 = replaceToken(globalSetting.getString("{category}", String.format("{javaClassName}_%s_highlights", ID)));',
+        f'{makeBigBackspace(2)}String t1 = replaceToken(globalSetting.getString("{category}", String.format("{javaClassName}_%s_highlights", ID)));',
         f'{makeBigBackspace(2)}if (t1.contains(" || ")) {{',
         f'{makeBigBackspace(3)}return t1.split(" \\\\|\\\\| ");',
         f'{makeBigBackspace(2)}}} else if (t1.contains("||")) {{',
@@ -174,15 +175,15 @@ def mainFunc(**kwargs):
                 scriptsText.remove(scriptLine)
         if highlightColor is None or len(highlightTexts) == 0:
             continue
-        # 开始处理事情
+        # 开始处理事情，这段代码是把高亮文本都换成特定标识符，然后把非高亮文本从原文中分离出来
         replaceToken = hashlib.md5(ruleText.encode('utf-8')).hexdigest()
         noHighlightText = lineData['text']
         for t2 in highlightTexts:
             noHighlightText = noHighlightText.replace(t2, replaceToken)
-        noHighlightTexts = noHighlightText.split(replaceToken)
-        for t2 in noHighlightTexts.copy():
-            if t2.strip() == '':
-                noHighlightTexts.remove(t2)
+        noHighlightTexts = []
+        for t2 in noHighlightText.split(replaceToken):  # 250628：改进处理逻辑，从非高亮文本中直接移除空白字符和尾随换行符
+            if t2.strip() != '':
+                noHighlightTexts.append(t2.strip())
         if len(noHighlightTexts) == 0:  # 这说明整个文段都是高亮，不需要特别进行高亮处理
             switchCodes += [
                 f'{makeBigBackspace(3)}case "{ruleID}":',
@@ -194,30 +195,54 @@ def mainFunc(**kwargs):
             colorTextList.add(highlightColor)  # 添加至高亮颜色数据库
             if '%' in ruleText:  # 防止高亮报错
                 ruleText = ruleText.replace('%', '%%').replace('%%%%', '%%')
-            stringsData[f'{javaClassName}_{ruleID}'] = ruleText.replace('\r\n', '\n')  # 把原始文本加入strings.json里
-            highlightTextCode = []
-            # hightlightID = 1
-            for t3 in range(len(noHighlightTexts)):
-                t2 = noHighlightTexts[t3].strip()
-                if len(t2.splitlines()) > 1:  # 高亮文本内强制分段
-                    for t5 in t2.splitlines():
-                        if len(t5) > 0:  # 避免添加无意义换行符
-                            highlightTextCode.append(t5)
-                        # stringsData[f'{javaClassName}_{ruleID}_highlight_{hightlightID}'] = t5
-                        # highlightTextCode.append(f'getString({ruleID}, {hightlightID})')
-                        # hightlightID += 1
-                else:
-                    highlightTextCode.append(t2)
-                    # stringsData[f'{javaClassName}_{ruleID}_highlight_{hightlightID}'] = t2
-                    # highlightTextCode.append(f'getString({ruleID}, {hightlightID})')
-                    # hightlightID += 1
-            # t4 = ','.join(highlightTextCode)
-            stringsData[f'{javaClassName}_{ruleID}_highlights'] = ' || '.join(highlightTextCode)
-            switchCodes += [
-                f'{makeBigBackspace(3)}case "{ruleID}":',
-                f'{makeBigBackspace(4)}textPanel.addPara(getString("{ruleID}"), {highlightColor}, textColor, getHighlightsString("{ruleID}"));',
-                f'{makeBigBackspace(4)}break;'
-            ]
+            # 250628：一个新的检测逻辑用于实现分段高亮机制
+            if len(ruleText.splitlines()) > 1:
+                switchCodes.append(f'{makeBigBackspace(3)}case "{ruleID}":')
+
+                ruleTextSplit = ruleText.splitlines()
+                while '' in ruleTextSplit:
+                    ruleTextSplit.remove('')
+                # 移除所有空白文本后开始遍历
+                textID = 1
+                for ruleTextLine in ruleTextSplit:
+                    flag_foundHighlight = False
+                    flag_endContinue = False
+                    highlightTexts = []
+                    for t3 in noHighlightTexts.copy():
+                        if t3 == ruleTextLine:  # 适用于整段完全相符的情况
+                            switchCodes.append(f'{makeBigBackspace(4)}textPanel.addPara(getString("{ruleID}_{textID}"), textColor);')
+                            stringsData[f'{javaClassName}_{ruleID}_{textID}'] = ruleTextLine
+                            flag_endContinue = True
+                            noHighlightTexts.remove(t3)
+                            textID += 1
+                            break
+                        elif t3 in ruleTextLine:  # 这是最普遍的情况
+                            highlightTexts.append(t3)
+                            noHighlightTexts.remove(t3)
+                            flag_foundHighlight = True
+                    # 搜索完反向高亮后，处理下一阶段
+                    if flag_endContinue:
+                        continue
+                    elif flag_foundHighlight:
+                        switchCodes.append(f'{makeBigBackspace(4)}textPanel.addPara(getString("{ruleID}_{textID}"), {highlightColor}, textColor, getHighlightsString("{ruleID}_{textID}"));')
+                        stringsData[f'{javaClassName}_{ruleID}_{textID}'] = ruleTextLine
+                        stringsData[f'{javaClassName}_{ruleID}_{textID}_highlights'] = ' || '.join(highlightTexts)
+                        textID += 1
+                    else:  # 反向高亮文本均未在此段中找到，则该段全部是高亮文本，走高亮语法
+                        switchCodes.append(
+                            f'{makeBigBackspace(4)}textPanel.addPara(getString("{ruleID}_{textID}"), {highlightColor});')
+                        stringsData[f'{javaClassName}_{ruleID}_{textID}'] = ruleTextLine
+                        textID += 1
+
+                switchCodes.append(f'{makeBigBackspace(4)}break;')
+            else: # 适用于一段文本的普遍情况
+                stringsData[f'{javaClassName}_{ruleID}'] = ruleText.replace('\r\n', '\n')  # 把原始文本加入strings.json里
+                stringsData[f'{javaClassName}_{ruleID}_highlights'] = ' || '.join(noHighlightTexts)
+                switchCodes += [
+                    f'{makeBigBackspace(3)}case "{ruleID}":',
+                    f'{makeBigBackspace(4)}textPanel.addPara(getString("{ruleID}"), {highlightColor}, textColor, getHighlightsString("{ruleID}"));',
+                    f'{makeBigBackspace(4)}break;'
+                ]
         scriptsText.append(javaClassName)
         if addRulesHint:
             scriptsText.append(f'# 文本被置换了，请参看 strings.json 中的 {stringsCategory}#{javaClassName}_{ruleID} 来了解 text 部分')
@@ -240,11 +265,16 @@ def mainFunc(**kwargs):
 
     with open(os.path.join(stringsJSONOutputFolder, 'strings.json'), 'w', encoding='UTF-8') as stringsFile:
         tempContents = json.dumps({stringsCategory: stringsData}, indent=4, ensure_ascii=False).splitlines()
+        reNumberEnd = re.compile(r'_\d+$')
         if addStringsHint:
             for lineID in range(len(tempContents)):
                 if '_highlights' in tempContents[lineID]:
                     tempContents[lineID] += ' // 反向高亮文本'
                 elif f'"{javaClassName}_' in tempContents[lineID]:
                     ruleID = tempContents[lineID].split(f'"{javaClassName}_')[1].split('"')[0]
-                    tempContents[lineID] += f' // 对应rules.csv词条ID为 rules.csv#{ruleID}$text'
+                    if reNumberEnd.search(ruleID) is not None:
+                        originalRuleID, _, paraID = ruleID.rpartition('_')
+                        tempContents[lineID] += f' // 对应rules.csv词条ID为 rules.csv#{originalRuleID}$text，这是该文本的第{paraID}段'
+                    else:
+                        tempContents[lineID] += f' // 对应rules.csv词条ID为 rules.csv#{ruleID}$text'
         stringsFile.write('\n'.join(tempContents))

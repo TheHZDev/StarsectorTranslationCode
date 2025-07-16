@@ -183,7 +183,12 @@ def mainFunc(**kwargs):
         noHighlightTexts = []
         for t2 in noHighlightText.split(replaceToken):  # 250628：改进处理逻辑，从非高亮文本中直接移除空白字符和尾随换行符
             if t2.strip() != '':
-                noHighlightTexts.append(t2.strip())
+                if '\n' in t2: # 250716：修复无高亮文本中存在换行符导致识别异常的bug
+                    for t3 in t2.splitlines():
+                        if len(t3) > 0:
+                            noHighlightTexts.append(t3.strip())
+                else:
+                    noHighlightTexts.append(t2.strip())
         if len(noHighlightTexts) == 0:  # 这说明整个文段都是高亮，不需要特别进行高亮处理
             switchCodes += [
                 f'{makeBigBackspace(3)}case "{ruleID}":',
@@ -208,17 +213,28 @@ def mainFunc(**kwargs):
                     flag_foundHighlight = False
                     flag_endContinue = False
                     highlightTexts = []
+                    toDetect: str = ruleTextLine.strip()  # 分出来专门作为高亮检测使用
                     for t3 in noHighlightTexts.copy():
-                        if t3 == ruleTextLine:  # 适用于整段完全相符的情况
+                        if t3 == toDetect:  # 适用于整段完全相符的情况
                             switchCodes.append(f'{makeBigBackspace(4)}textPanel.addPara(getString("{ruleID}_{textID}"), textColor);')
                             stringsData[f'{javaClassName}_{ruleID}_{textID}'] = ruleTextLine
                             flag_endContinue = True
                             noHighlightTexts.remove(t3)
                             textID += 1
                             break
-                        elif t3 in ruleTextLine:  # 这是最普遍的情况
+                        elif t3 not in toDetect and flag_foundHighlight:  # 一旦匹配到不存在的就立即跳出循环
+                            break
+                        elif t3 in toDetect:  # 这是最普遍的情况
                             highlightTexts.append(t3)
                             noHighlightTexts.remove(t3)
+                            toDetect = toDetect.replace(t3, '')  # 250716：修复有两段话有两句完全重复的非高亮文本时，后面的那句无法实现高亮的bug
+                            # 250716：新增原文本闭环处理逻辑，自动加上{和}
+                            if ruleTextLine.startswith(t3):
+                                ruleTextLine = ruleTextLine.replace(t3, t3 + '}', 1)
+                            elif ruleTextLine.endswith(t3):
+                                ruleTextLine = ruleTextLine.replace(t3, '{' + t3, 1)
+                            else:
+                                ruleTextLine = ruleTextLine.replace(t3, '{' + t3 + '}', 1)
                             flag_foundHighlight = True
                     # 搜索完反向高亮后，处理下一阶段
                     if flag_endContinue:

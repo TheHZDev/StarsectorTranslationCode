@@ -4,7 +4,7 @@ import pprint
 import re
 from enum import Enum
 from hashlib import md5
-from os import sep, scandir, DirEntry
+from os import sep, scandir, DirEntry, walk
 from os.path import isfile, isdir
 from pathlib import Path
 from typing import List, Dict, Tuple, NamedTuple
@@ -119,6 +119,7 @@ class ParatrazProject:
                     continue
                 print(f'已略过：{originalFile}')
             self.__dealWithMission()
+            self.__dealWithVariants()
             csvSubParatranz.OriginalToParatranz()
             print('翻译文件解析完毕。')
         elif userSelect == '2':
@@ -131,8 +132,48 @@ class ParatrazProject:
                     print(f'已从 {paratranzFile} 整合了译文，并写回了对应文件。')
                     continue
             self.__dealWithMission(True)
+            self.__dealWithVariants(True)
             csvSubParatranz.ParatranzToLocalization()
             print('译文文件解析完毕。')
+
+    def __dealWithVariants(self, funcID: bool = False):
+        """装配名称归一化处理器，此函数不是外包函数，而会自主处理所有装配代码。"""
+        originalPath = sep.join([ORIGINAL_PATH, 'data', 'variants'])
+        targetParatranzFile = sep.join([PARA_TRANZ_PATH, 'data', 'variants', 'index.json'])
+        if not funcID:  # 翻译
+            result = []
+            for folderPath, _ , fileNames in walk(originalPath):
+                for fileName in fileNames:
+                    if fileName.endswith('.variant'):
+                        # 构造真实路径
+                        realFilePath = sep.join([folderPath, fileName])
+                        paratranzWordKey = realFilePath.rpartition(originalPath)[-1]
+                        with open(realFilePath, 'r', encoding='utf-8') as f:
+                            jsonData = json5.loads(SubParatranz.filterJSON5(f.read()))
+                            if 'displayName' in jsonData:
+                                result.append(ParatranzDataUnit(paratranzWordKey, jsonData['displayName'],
+                                                                f'[本行原始数据]\n{pprint.pformat(jsonData, sort_dicts=False)}'))
+            self.__makeDirs(targetParatranzFile)
+            with open(targetParatranzFile, 'w', encoding='UTF-8') as tFile:
+                json.dump([x.asDict() for x in result], tFile, ensure_ascii=False, indent=4)
+        else:  # 写回
+            outputBaseFolder = sep.join([TRANSLATION_PATH, 'data', 'variants'])
+            if not isfile(targetParatranzFile):
+                print('未发现装配数据文件。')
+                return
+            with open(targetParatranzFile, encoding='UTF-8') as tFile:
+                result = [ParatranzDataUnit(**dataDict) for dataDict in json.load(tFile)]
+            for line in result:
+                if line.isTranslated:
+                    with open(sep.join([originalPath, line.key]), encoding='UTF-8') as f1:
+                        jsonData = json5.loads(SubParatranz.filterJSON5(f1.read()))
+                        jsonData['displayName'] = line.translation
+                        # 写回目标路径
+                        targetTranslationPath = sep.join([outputBaseFolder, line.key])
+                        self.__makeDirs(targetTranslationPath)
+                        with open(targetTranslationPath, 'w', encoding='UTF-8') as f2:
+                            json.dump(jsonData, f2, ensure_ascii=False, indent=4)
+        print(f'已处理了 {len(result)} 条装配数据。')
 
     def __dealWithMission(self, funcID: bool = False):
         """战役系统处理器"""
@@ -461,9 +502,6 @@ class SubParatranz(ParatrazProject):
         self.ImportOneConfig(Register=RegisterEnum.path,
                              Path=['/data/config/contact_tag_data.json', '/data/config/tag_data.json'],
                              FromOriginal=self.inTagData, ToLocalization=self.outTagData)
-        # 原版 - 装配文件的显示名称
-        self.ImportOneConfig(Register=RegisterEnum.folder_ext, Folder_Ext=[('/data/variants/', 'variant')],
-                             FromOriginal=self.inVariant, ToLocalization=self.outVariant, ExtendSubFolder=True)
         # 星际领主mod - 领主的部分描述数据
         self.ImportOneConfig(Register=RegisterEnum.path, Path=['/data/lords/lords.json'],
                              FromOriginal=self.inLords, ToLocalization=self.outLords)
@@ -478,7 +516,7 @@ class SubParatranz(ParatrazProject):
     def inMissions(self, *args):
         result = []
         with open(args[0], encoding='UTF-8') as tFile:
-            tContent: dict = json5.loads(self.__filterJSON5(tFile.read()))
+            tContent: dict = json5.loads(self.filterJSON5(tFile.read()))
             for unit in ('title', 'difficulty'):
                 if unit in tContent:
                     result.append(self.__buildDict('mission#' + unit, tContent[unit]))
@@ -488,7 +526,7 @@ class SubParatranz(ParatrazProject):
 
     def outMissions(self, *args):
         with open(args[0], encoding='UTF-8') as tFile:
-            tContent: dict = json5.loads(self.__filterJSON5(tFile.read()))
+            tContent: dict = json5.loads(self.filterJSON5(tFile.read()))
         for unit in self.__readParatranzJSON(args[2]):
             if unit.isTranslated:
                 if unit.key == 'mission#text':
@@ -504,7 +542,7 @@ class SubParatranz(ParatrazProject):
     # data/strings/strings.json
     def inStringsJSON(self, *args):
         with open(args[0], encoding='UTF-8') as tFile:
-            tFileContent = self.__filterJSON5(tFile.read())
+            tFileContent = self.filterJSON5(tFile.read())
         # 读取JSON
         commentCode = {}
         searchHint = re.compile('[^\\\\]",?[ \t]*//')
@@ -543,7 +581,7 @@ class SubParatranz(ParatrazProject):
     def inFactions(self, *args):
         with open(args[0], encoding='UTF-8') as tFile:
             tFileContent: dict = json5.loads(
-                self.__quoteSpecialDataForIn(re.compile('^"?tags"?: *\\['), self.__filterJSON5(tFile.read())))
+                self.__quoteSpecialDataForIn(re.compile('^"?tags"?: *\\['), self.filterJSON5(tFile.read())))
         # 预定义关键字解析
         result = []
         # 240819：增补了对势力文件中部分势力名称Key的注解
@@ -581,7 +619,7 @@ class SubParatranz(ParatrazProject):
     def outFactions(self, *args):
         with open(args[0], encoding='UTF-8') as tFile:
             preContent, toReplaceData = self.__quoteSpecialDataForOut(re.compile('^"?tags"?: *\\['),
-                                                                      self.__filterJSON5(tFile.read()))
+                                                                      self.filterJSON5(tFile.read()))
             tOriginal: dict = json5.loads(preContent)
         # 读取原文文件内容
         tTranslation = self.__readParatranzJSON(args[1])
@@ -620,7 +658,7 @@ class SubParatranz(ParatrazProject):
     # data/strings/tips.json
     def inTips(self, *args):
         tFile = open(args[0], encoding='UTF-8')
-        tOriginal: dict = json5.loads(self.__filterJSON5(tFile.read()))
+        tOriginal: dict = json5.loads(self.filterJSON5(tFile.read()))
         tFile.close()
         # 读取原文文件内容
         result = []
@@ -650,7 +688,7 @@ class SubParatranz(ParatrazProject):
     # data/config/chatter/characters/*.json
     def inChatter(self, *args):
         with open(args[0], encoding='UTF-8') as tFile:
-            tContent: dict = json5.loads(self.__filterJSON5(tFile.read()))
+            tContent: dict = json5.loads(self.filterJSON5(tFile.read()))
         tVar: Dict[str, List[Dict[str, str]]] = tContent.pop('lines')
         result = []
         personName = tContent.get('name')
@@ -664,7 +702,7 @@ class SubParatranz(ParatrazProject):
 
     def outChatter(self, *args):
         with open(args[0], encoding='UTF-8') as tFile:
-            tOriginal: dict = json5.loads(self.__filterJSON5(tFile.read()))
+            tOriginal: dict = json5.loads(self.filterJSON5(tFile.read()))
         tTranslation = self.__readParatranzJSON(args[1])
         result = {}
         for unit in tTranslation:
@@ -681,7 +719,7 @@ class SubParatranz(ParatrazProject):
     # data/config/exerelin/customStarts.json
     def inCustomStart(self, *args):
         with open(args[0], encoding='UTF-8') as tFile:
-            tContent: List[dict] = json5.loads(self.__filterJSON5(tFile.read()))['starts']
+            tContent: List[dict] = json5.loads(self.filterJSON5(tFile.read()))['starts']
         result = []
         for unit in tContent:
             unitID = unit.get('id')
@@ -693,7 +731,7 @@ class SubParatranz(ParatrazProject):
     def outCustomStart(self, *args):
         tOriginal = {}
         with open(args[0], encoding='UTF-8') as tFile:
-            tContent: List[dict] = json5.loads(self.__filterJSON5(tFile.read()))['starts']
+            tContent: List[dict] = json5.loads(self.filterJSON5(tFile.read()))['starts']
             for unit in tContent:
                 tOriginal[unit.get('id')] = unit
         for unit in self.__readParatranzJSON(args[1]):
@@ -707,7 +745,7 @@ class SubParatranz(ParatrazProject):
     # data/config/exerelin/allianceNames.json
     def inAllianceNames(self, *args):
         with open(args[0], encoding='UTF-8') as tFile:
-            tOriginal: Dict[str, Dict[str, Dict[str, List[str]]]] = json5.loads(self.__filterJSON5(tFile.read()))
+            tOriginal: Dict[str, Dict[str, Dict[str, List[str]]]] = json5.loads(self.filterJSON5(tFile.read()))
         result = []
         for firstKey in tOriginal.keys():
             for secondKey in tOriginal[firstKey].keys():
@@ -742,7 +780,7 @@ class SubParatranz(ParatrazProject):
     def inDiplomacyConfig(self, *args):
         # 只处理event区块
         with open(args[0], encoding="UTF-8") as tFile:
-            tOriginal: List[dict] = json5.loads(self.__filterJSON5(tFile.read()))['events']
+            tOriginal: List[dict] = json5.loads(self.filterJSON5(tFile.read()))['events']
         result = []
         for eventUnit in tOriginal:
             stageID = eventUnit.get('stage')
@@ -756,7 +794,7 @@ class SubParatranz(ParatrazProject):
 
     def outDiplomacyConfig(self, *args):
         with open(args[0], encoding='UTF-8') as tFile:
-            tOriginal: dict = json5.loads(self.__filterJSON5(tFile.read()))
+            tOriginal: dict = json5.loads(self.filterJSON5(tFile.read()))
         tEvent: List[dict] = tOriginal['events']
         for unit in self.__readParatranzJSON(args[1]):
             if unit.isTranslated:
@@ -771,7 +809,7 @@ class SubParatranz(ParatrazProject):
     # data/world/factions/default_ranks.json
     def inDefaultRanks(self, *args):
         with open(args[0], encoding='UTF-8') as tFile:
-            tOriginal: Dict[str, Dict[str, Dict[str, str]]] = json5.loads(self.__filterJSON5(tFile.read()))
+            tOriginal: Dict[str, Dict[str, Dict[str, str]]] = json5.loads(self.filterJSON5(tFile.read()))
         result = []
         for firstKey in tOriginal.keys():
             for secondKey in tOriginal[firstKey].keys():
@@ -783,7 +821,7 @@ class SubParatranz(ParatrazProject):
 
     def outDefaultRanks(self, *args):
         with open(args[0], encoding='UTF-8') as tFile:
-            tOriginal: Dict[str, Dict[str, Dict[str, str]]] = json5.loads(self.__filterJSON5(tFile.read()))
+            tOriginal: Dict[str, Dict[str, Dict[str, str]]] = json5.loads(self.filterJSON5(tFile.read()))
         for unit in self.__readParatranzJSON(args[1]):
             if unit.isTranslated:
                 firstKey, tVar = unit.key.split('#')
@@ -798,7 +836,7 @@ class SubParatranz(ParatrazProject):
     def inMagicBountyData(self, *args):
         """这部分处理的是MagicLib的自带HVB部分。"""
         with open(args[0], encoding='UTF-8') as tFile:
-            tOriginal: Dict[str, dict] = json5.loads(self.__filterJSON5(tFile.read()))
+            tOriginal: Dict[str, dict] = json5.loads(self.filterJSON5(tFile.read()))
         result = []
         # 240819：增补了对高价值赏金（HVB）中部分Key的注解
         hintDict = {'job_name': '赏金名称', 'job_description': '赏金的说明文本',
@@ -835,7 +873,7 @@ class SubParatranz(ParatrazProject):
                     'vengeanceFleetNames': '势力争霸mod中派出的复仇舰队名称',
                     'vengeanceFleetNamesSingle': '势力争霸mod中派出的复仇舰队名称'}
         with open(args[0], encoding='UTF-8') as tFile:
-            tOriginal: dict = json5.loads(self.__filterJSON5(tFile.read()))
+            tOriginal: dict = json5.loads(self.filterJSON5(tFile.read()))
         result = []
         for translateKey in toTranslateKeys:
             if translateKey in tOriginal:
@@ -852,7 +890,7 @@ class SubParatranz(ParatrazProject):
 
     def outExerelinFactionConfig(self, *args):
         with open(args[0], encoding='UTF-8') as tFile:
-            tOriginal: dict = json5.loads(self.__filterJSON5(tFile.read()))
+            tOriginal: dict = json5.loads(self.filterJSON5(tFile.read()))
         for unit in self.__readParatranzJSON(args[1]):
             if unit.isTranslated:
                 if unit.key in tOriginal:
@@ -868,7 +906,7 @@ class SubParatranz(ParatrazProject):
     def inFactionConfigurations(self, *args):
         # 一看就是星舰传奇的玩意
         with open(args[0], encoding='UTF-8') as tFile:
-            tOriginal: Dict[str, dict] = json5.loads(self.__filterJSON5(tFile.read()))
+            tOriginal: Dict[str, dict] = json5.loads(self.filterJSON5(tFile.read()))
         result = []
         for firstKey in tOriginal:
             if 'descriptionOverride' in tOriginal[firstKey].keys():
@@ -882,7 +920,7 @@ class SubParatranz(ParatrazProject):
     # data/hulls/*.ship
     def inShipFile(self, *args):
         with open(args[0], encoding='UTF-8') as tFile:
-            tOriginal: dict = json5.loads(self.__filterJSON5(tFile.read()))
+            tOriginal: dict = json5.loads(self.filterJSON5(tFile.read()))
         result = []
         if 'hullName' in tOriginal:
             result.append(self.__buildDict(f'root#hullName', tOriginal['hullName'],
@@ -896,7 +934,7 @@ class SubParatranz(ParatrazProject):
     def inHullSkinFile(self, *args):
         with open(args[0], encoding='UTF-8') as tFile:
             tOriginal: dict = json5.loads(self.__quoteSpecialDataForIn(re.compile('^"?(hints|removeHints|addHints)"?:'),
-                                                                       self.__filterJSON5(tFile.read())))
+                                                                       self.filterJSON5(tFile.read())))
         result = []
         for keyStr in ('hullName', 'descriptionPrefix', 'tech'):
             if keyStr in tOriginal:
@@ -907,7 +945,7 @@ class SubParatranz(ParatrazProject):
     def outHullSkinFile(self, *args):
         with open(args[0], encoding='UTF-8') as tFile:
             preContent, toReplaceData = self.__quoteSpecialDataForOut(re.compile('^"?(hints|removeHints|addHints)"?:'),
-                                                                      self.__filterJSON5(tFile.read()))
+                                                                      self.filterJSON5(tFile.read()))
             tOriginal = json5.loads(preContent)
         for unit in self.__readParatranzJSON(args[1]):
             if unit.isTranslated:
@@ -945,7 +983,7 @@ class SubParatranz(ParatrazProject):
     def inCustomEntity(self, *args):
         with open(args[0], encoding='UTF-8') as tFile:
             tOriginal: dict = json5.loads(
-                self.__quoteSpecialDataForIn(re.compile('^"layers":'), self.__filterJSON5(tFile.read())))
+                self.__quoteSpecialDataForIn(re.compile('^"layers":'), self.filterJSON5(tFile.read())))
         result = []
         for firstKey in tOriginal:
             secondDict: dict = tOriginal[firstKey]
@@ -964,7 +1002,7 @@ class SubParatranz(ParatrazProject):
     def outCustomEntity(self, *args):
         with open(args[0], encoding='UTF-8') as tFile:
             preContent, toReplaceData = self.__quoteSpecialDataForOut(re.compile('^"layers"'),
-                                                                      self.__filterJSON5(tFile.read()))
+                                                                      self.filterJSON5(tFile.read()))
             tOriginal: dict = json5.loads(preContent)
         for unit in self.__readParatranzJSON(args[1]):
             if unit.isTranslated:
@@ -1051,7 +1089,7 @@ class SubParatranz(ParatrazProject):
     # mod_info.json
     def inModInfo(self, *args):
         with open(args[0], encoding='UTF-8') as tFile:
-            tOriginal: dict = json5.loads(self.__filterJSON5(tFile.read()))
+            tOriginal: dict = json5.loads(self.filterJSON5(tFile.read()))
         result = []
         hintBox = {'name': '本Mod的名称', 'description': '本Mod的描述'}
         for unitKey in hintBox:
@@ -1064,7 +1102,7 @@ class SubParatranz(ParatrazProject):
     # data/config/planets.json
     def inPlanets(self, *args):
         with open(args[0], encoding='UTF-8') as tFile:
-            tOriginal: dict = json5.loads(self.__filterJSON5(tFile.read()))
+            tOriginal: dict = json5.loads(self.filterJSON5(tFile.read()))
         result = []
         for planetID in tOriginal:
             if 'name' in tOriginal[planetID]:
@@ -1082,7 +1120,7 @@ class SubParatranz(ParatrazProject):
         from csv import DictReader
 
         with open(args[0], encoding='UTF-8') as tFile:
-            tOriginal: dict = json5.loads(self.__filterJSON5(tFile.read()))
+            tOriginal: dict = json5.loads(self.filterJSON5(tFile.read()))
         result = []
         allDesignType = set()
         if 'designTypeColors' in tOriginal:
@@ -1118,7 +1156,7 @@ class SubParatranz(ParatrazProject):
     # data/config/battle_objectives.json
     def inBattleObjectives(self, *args):
         with open(args[0], encoding='UTF-8') as tFile:
-            tOriginal: dict = json5.loads(self.__filterJSON5(tFile.read()))
+            tOriginal: dict = json5.loads(self.filterJSON5(tFile.read()))
         result = []
         for firstKey in tOriginal:
             if 'name' in tOriginal[firstKey]:
@@ -1136,7 +1174,7 @@ class SubParatranz(ParatrazProject):
             for t2 in re.findall('"?scope\\d?"? *: *CUSTOM', t0):
                 t3 = t2.split(':')[0].strip()
                 t0 = t0.replace(t2, t3 + ':"CUSTOM"')
-            tOriginal: dict = json5.loads(self.__filterJSON5(t0))
+            tOriginal: dict = json5.loads(self.filterJSON5(t0))
         # 以上操作是为了过滤某些又不好好写文件的SB Modder
         result = []
         for unitKey in tOriginal.keys():
@@ -1157,7 +1195,7 @@ class SubParatranz(ParatrazProject):
             for t2 in re.findall('"?scope\\d?"? *: *CUSTOM', t0):
                 t3 = t2.split(':').strip()
                 t0 = t0.replace(t2, t3 + ':"CUSTOM"')
-            tOriginal: dict = json5.loads(self.__filterJSON5(t0))
+            tOriginal: dict = json5.loads(self.filterJSON5(t0))
         for unit in self.__readParatranzJSON(args[1]):
             if unit.isTranslated:
                 if unit.key.startswith('root#'):
@@ -1171,7 +1209,7 @@ class SubParatranz(ParatrazProject):
     # data/config/sotf/sotf_officerConvos.json
     def inSoTFOfficerConvos(self, *args):
         with open(args[0], encoding='UTF-8') as tFile:
-            tOriginal: dict = json5.loads(self.__filterJSON5(tFile.read()))
+            tOriginal: dict = json5.loads(self.filterJSON5(tFile.read()))
         result = []
         for unitKey in tOriginal:
             descText = pprint.pformat({unitKey: tOriginal[unitKey]}, sort_dicts=False)
@@ -1184,7 +1222,7 @@ class SubParatranz(ParatrazProject):
 
     def outSoTFOfficerConvos(self, *args):
         with open(args[0], encoding='UTF-8') as tFile:
-            tOriginal: dict = json5.loads(self.__filterJSON5(tFile.read()))
+            tOriginal: dict = json5.loads(self.filterJSON5(tFile.read()))
         for unit in self.__readParatranzJSON(args[1]):
             if unit.isTranslated:
                 key, numID = unit.key.split('#')
@@ -1195,7 +1233,7 @@ class SubParatranz(ParatrazProject):
     # data/config/contact_tag_data.json 和 data/config/tag_data.json
     def inTagData(self, *args):
         with open(args[0], encoding='UTF-8') as tFile:
-            tOriginal: dict = json5.loads(self.__filterJSON5(tFile.read()))
+            tOriginal: dict = json5.loads(self.filterJSON5(tFile.read()))
         result = []
         if args[0].endswith('contact_tag_data.json'):
             contextTextPrefix = '联络人的Tag的名称（比如 海盗/军方 那些）'
@@ -1210,19 +1248,6 @@ class SubParatranz(ParatrazProject):
 
     def outTagData(self, *args):
         self.__commonTranslateFunc_v2(*args)
-
-    # data/variants/*.variant
-    def inVariant(self, *args):
-        with open(args[0], encoding='UTF-8') as tFile:
-            tOriginal: dict = json5.loads(self.__filterJSON5(tFile.read()))
-        result = []
-        if 'displayName' in tOriginal and tOriginal['displayName'] != '':
-            result.append(self.__buildDict(f'root#displayName', tOriginal['displayName'],
-                                           f'[本文件原始数据]\n{pprint.pformat(tOriginal, sort_dicts=False)}'))
-        self.__writeParatranzJSON(result, args[1])
-
-    def outVariant(self, *args):
-        self.__commonTranslateFunc_v1(*args)
 
     # data/lords/lords.json
     def inLords(self, *args):
@@ -1248,7 +1273,7 @@ class SubParatranz(ParatrazProject):
     # data/config/exerelin/groundBattleDefs.json
     def inGroundBattleDefs(self, *args):
         with open(args[0], encoding='UTF-8') as tFile:
-            tOriginal: dict = json5.loads(self.__filterJSON5(tFile.read()))
+            tOriginal: dict = json5.loads(self.filterJSON5(tFile.read()))
         result = []
         if 'conditions' in tOriginal:
             for conditionID in tOriginal['conditions']:
@@ -1276,7 +1301,7 @@ class SubParatranz(ParatrazProject):
     # data/config/exerelin/mercConfig.json
     def inMercenaryConfig(self, *args):
         with open(args[0], encoding='UTF-8') as tFile:
-            tOriginal: dict = json5.loads(self.__filterJSON5(tFile.read()))
+            tOriginal: dict = json5.loads(self.filterJSON5(tFile.read()))
         result = []
         if 'companies' in tOriginal:
             for firstID in tOriginal['companies']:
@@ -1294,7 +1319,8 @@ class SubParatranz(ParatrazProject):
         self.__commonTranslateFunc_vAny(3, *args)
 
     @staticmethod
-    def __filterJSON5(fileContent: str):
+    def filterJSON5(fileContent: str):
+        # 251028：此方法改为public，以便可以从外部调用
         fileContent = fileContent.strip()
         if fileContent.endswith('},'):
             fileContent = fileContent[:-1]
@@ -1365,7 +1391,7 @@ class SubParatranz(ParatrazProject):
         if layerNum < 1:
             return
         with open(args[0], encoding='UTF-8') as tFile:
-            tOriginal: Dict[str, dict] = json5.loads(self.__filterJSON5(tFile.read()))
+            tOriginal: Dict[str, dict] = json5.loads(self.filterJSON5(tFile.read()))
 
         # 递归检查层级，适用于多种复合情况
         def checkExistAndReplace(layerData: list, layerIndex: int, translationStr: str, originalData: dict):

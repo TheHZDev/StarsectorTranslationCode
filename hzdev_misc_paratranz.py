@@ -35,7 +35,7 @@ class RegisterEnum(Enum):
     all: str = 'Everything'
 
 
-class ParatrazProject:
+class ParatranzProject:
 
     def __init__(self):
         """
@@ -386,7 +386,7 @@ class QuotedSpecialData(NamedTuple):
         return endContent
 
 
-class SubParatranz(ParatrazProject):
+class SubParatranz(ParatranzProject):
 
     def ImportOneConfig(self, **kwargs):
         if kwargs.get('Register') == RegisterEnum.mission:
@@ -424,6 +424,7 @@ class SubParatranz(ParatrazProject):
                 thisConfig['Folder_Ext'] = kwargs.get('Folder_Ext')
                 thisConfig['ExtendSubFolder'] = kwargs.get('ExtendSubFolder', False)  # 250104：扩展相对目录处理范围，使得该功能可以处理其子目录
             self.Config.append(thisConfig)
+        return True
 
     def ImportConfig(self):
         # 原版 - 战役外置文件的统一处理模块
@@ -933,7 +934,7 @@ class SubParatranz(ParatrazProject):
     # data/hulls/skins/*.skin
     def inHullSkinFile(self, *args):
         with open(args[0], encoding='UTF-8') as tFile:
-            tOriginal: dict = json5.loads(self.__quoteSpecialDataForIn(re.compile('^"?(hints|removeHints|addHints)"?:'),
+            tOriginal: dict = json5.loads(self.__quoteSpecialDataForIn(re.compile('^"?(hints|removeHints|addHints|type)"?:'),
                                                                        self.filterJSON5(tFile.read())))
         result = []
         for keyStr in ('hullName', 'descriptionPrefix', 'tech'):
@@ -944,7 +945,7 @@ class SubParatranz(ParatrazProject):
 
     def outHullSkinFile(self, *args):
         with open(args[0], encoding='UTF-8') as tFile:
-            preContent, toReplaceData = self.__quoteSpecialDataForOut(re.compile('^"?(hints|removeHints|addHints)"?:'),
+            preContent, toReplaceData = self.__quoteSpecialDataForOut(re.compile('^"?(hints|removeHints|addHints|type)"?:'),
                                                                       self.filterJSON5(tFile.read()))
             tOriginal = json5.loads(preContent)
         for unit in self.__readParatranzJSON(args[1]):

@@ -194,7 +194,7 @@ class csvSubParatranz:
         if len(result) > 0:
             print(f'从 {config.relativeFilePath} 文件中加载了 {len(result)} 条原文数据。')
             config.makeFolders(folderParatranz=True)
-            with open(config.absoluteParatranzFilePath, 'w', encoding='utf-8') as tFile:
+            with open(config.absoluteParatranzFilePath, 'w', encoding='utf-8', errors='ignore') as tFile:
                 json.dump(result, tFile, ensure_ascii=False, indent=4)
 
     def __commonToCSV(self, config: SingleFileConfig):

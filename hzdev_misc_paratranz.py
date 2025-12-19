@@ -1134,7 +1134,7 @@ class SubParatranz(ParatranzProject):
                          ('campaign', 'special_items.csv')]:
             realFilePath = path_join(mainFolderPath, *filePath)
             if isfile(realFilePath):
-                with open(realFilePath, encoding='UTF-8') as tFile:
+                with open(realFilePath, encoding='UTF-8', errors='ignore') as tFile:
                     for lineData in list(DictReader(tFile)):
                         if 'tech/manufacturer' in lineData:
                             tVar = lineData['tech/manufacturer']

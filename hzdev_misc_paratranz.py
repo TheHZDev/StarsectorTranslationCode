@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import List, Dict, Tuple, NamedTuple
 
 import json5
+import hjson
 
 from hzdev_csv_paratranz import csvSubParatranz
 from dataModel import ParatranzDataUnit
@@ -512,6 +513,9 @@ class SubParatranz(ParatranzProject):
         # 势力争霸mod - 雇佣兵的名称及描述数据
         self.ImportOneConfig(Register=RegisterEnum.path, Path=['/data/config/exerelin/mercConfig.json'],
                              FromOriginal=self.inMercenaryConfig, ToLocalization=self.outMercenaryConfig)
+        # 星际领主mod - 通用对话数据和其它
+        self.ImportOneConfig(Register=RegisterEnum.path, Path=['/data/lords/dialog/dialog.json'],
+                             FromOriginal=self.inLordsDialog, ToLocalization=self.outLordsDialog)
 
     # data/missions/*
     def inMissions(self, *args):
@@ -937,7 +941,7 @@ class SubParatranz(ParatranzProject):
             tOriginal: dict = json5.loads(self.__quoteSpecialDataForIn(re.compile('^"?(hints|removeHints|addHints|type)"?:'),
                                                                        self.filterJSON5(tFile.read())))
         result = []
-        for keyStr in ('hullName', 'descriptionPrefix', 'tech'):
+        for keyStr in ('hullName', 'descriptionPrefix', 'tech', 'hullDesignation'):
             if keyStr in tOriginal:
                 result.append(self.__buildDict(f'root#{keyStr}', tOriginal[keyStr],
                                                f'[本行原始数据]\n{pprint.pformat(tOriginal, sort_dicts=False)}'))
@@ -1175,7 +1179,7 @@ class SubParatranz(ParatranzProject):
             for t2 in re.findall('"?scope\\d?"? *: *CUSTOM', t0):
                 t3 = t2.split(':')[0].strip()
                 t0 = t0.replace(t2, t3 + ':"CUSTOM"')
-            tOriginal: dict = json5.loads(self.filterJSON5(t0))
+            tOriginal: dict = hjson.loads(self.filterJSON5(t0))
         # 以上操作是为了过滤某些又不好好写文件的SB Modder
         result = []
         for unitKey in tOriginal.keys():
@@ -1318,6 +1322,27 @@ class SubParatranz(ParatranzProject):
 
     def outMercenaryConfig(self, *args):
         self.__commonTranslateFunc_vAny(3, *args)
+
+    # data/lords/dialog/dialog.json
+    def inLordsDialog(self, *args):
+        with open(args[0], encoding='UTF-8') as tFile:
+            tOriginal: dict = json5.loads(self.filterJSON5(tFile.read()))
+        result = []
+        for key1, dict1 in tOriginal.items():
+            if key1 == 'template' or 'lines' not in dict1:
+                continue
+            for key2, dict2 in dict1['lines'].items():
+                if 'lines' not in dict2:
+                    continue
+                for key3, value3 in dict2['lines'].items():
+                    if isinstance(value3, str):
+                        result.append(self.__buildDict(f'{key1}#{key2}#{key3}', value3))
+                    elif isinstance(value3, dict) and 'line' in value3 and isinstance(value3['line'], str):
+                        result.append(self.__buildDict(f'{key1}#{key2}#{key3}#line', value3['line']))
+        self.__writeParatranzJSON(result, args[1])
+
+    def outLordsDialog(self, *args):
+        pass
 
     @staticmethod
     def filterJSON5(fileContent: str):

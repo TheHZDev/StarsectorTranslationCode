@@ -1014,7 +1014,7 @@ class SubParatranz(ParatranzProject):
                 firstKey, secondKey = unit.key.split('#')
                 if firstKey in tOriginal:
                     tOriginal[firstKey][secondKey] = self.__getTranslation(unit)
-        preResult = toReplaceData.endTask(json5.dumps(tOriginal, ensure_ascii=False, indent=4, quote_keys=True))
+        preResult = toReplaceData.endTask(json.dumps(tOriginal, ensure_ascii=False, indent=4))
         with open(args[2], 'w', encoding='UTF-8') as tFile:
             tFile.write(preResult)
 
